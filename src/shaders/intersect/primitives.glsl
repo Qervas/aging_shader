@@ -4,7 +4,7 @@
 #include "../common/structures.glsl"
 #include "../common/constants.glsl"
 
-bool intersectSphere(Ray ray, Sphere sphere, out HitInfo hitInfo) {
+bool intersectSphere(Ray ray, Sphere sphere, float rustLevel, out HitInfo hitInfo) {
     vec3 oc = ray.origin - sphere.center;
     float a = dot(ray.direction, ray.direction);
     float b = 2.0 * dot(oc, ray.direction);
@@ -20,7 +20,7 @@ bool intersectSphere(Ray ray, Sphere sphere, out HitInfo hitInfo) {
     hitInfo.t = t;
     hitInfo.position = ray.origin + t * ray.direction;
     hitInfo.normal = normalize(hitInfo.position - sphere.center);
-    hitInfo.material = sphere.material;
+    hitInfo.material = createSteelMaterial(rustLevel, hitInfo.position - sphere.center);
     return true;
 }
 

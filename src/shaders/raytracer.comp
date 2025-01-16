@@ -18,14 +18,14 @@ uniform float rustLevel;
 Sphere sphere = Sphere(
         spherePosition, // center
         1.0, // radius
-        createSteelMaterial(rustLevel, spherePosition));
+        Material(STEEL_COLOR, 1.0, 0.1, 2.5));
 
 vec3 trace(Ray ray) {
     HitInfo hitInfo;
     hitInfo.hit = false;
 
     HitInfo sphereHit;
-    if (intersectSphere(ray, sphere, sphereHit)) {
+    if (intersectSphere(ray, sphere, rustLevel, sphereHit)) {
         hitInfo = sphereHit;
     }
 

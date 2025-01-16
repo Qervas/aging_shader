@@ -25,10 +25,26 @@ Material createGroundMaterial() {
     );
 }
 
-Material createSteelMaterial(float rustLevel, vec3 position) {
-    // Use position parameter instead of sphere.center
-    float noiseScale = 5.0;
-    float noiseValue = noise(position * noiseScale);
+Material createSteelMaterial(float rustLevel, vec3 worldPos) {
+    // Transform world position to local coordinates for stable noise pattern
+    vec3 localPos = worldPos;
+
+    // Reduce the noise scale to make the pattern more visible
+    float noiseScale = 2.0;
+
+    // Use multiple noise octaves for more interesting patterns
+    float noiseValue = 0.0;
+    float amplitude = 1.0;
+    float frequency = 1.0;
+
+    for (int i = 0; i < 3; i++) {
+        noiseValue += amplitude * noise(localPos * noiseScale * frequency);
+        amplitude *= 0.5;
+        frequency *= 2.0;
+    }
+
+    // Normalize noise value
+    noiseValue = noiseValue / 1.75;
 
     // Create patchy rust effect
     float localRust = mix(
