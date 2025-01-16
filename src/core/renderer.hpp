@@ -19,6 +19,11 @@ public:
     static std::string getShaderDirectory(const std::string& shaderPath);
     void moveSphere(const glm::vec3& delta);
     const glm::vec3& getSpherePosition() const { return spherePosition; }
+    void setRustLevel(float level) {
+        rustLevel = glm::clamp(level, 0.0f, 1.0f);
+    }
+    float getRustLevel() const { return rustLevel; }
+    void adjustRustLevel(float delta);
 
 private:
     int width, height;
@@ -26,6 +31,8 @@ private:
     GLuint outputTexture;
     glm::vec3 spherePosition{0.0f, 0.0f, -1.0f};
     GLint spherePositionLoc{-1};
+    float rustLevel{0.0f};  // Initial rust level
+    GLint rustLevelLoc{-1};
 
     void createShaders();
     void createOutputTexture();

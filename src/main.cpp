@@ -5,6 +5,7 @@
 const int WINDOW_WIDTH = 1024;
 const int WINDOW_HEIGHT = 768;
 const float MOVE_SPEED = 2.f;
+const float RUST_CHANGE_SPEED = 0.5f;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window, Renderer& renderer, float deltaTime);
@@ -92,6 +93,7 @@ void framebuffer_size_callback([[maybe_unused]]  GLFWwindow* window, int width, 
 
 void processInput(GLFWwindow* window, Renderer& renderer, float deltaTime) {
     const float moveSpeed = MOVE_SPEED * deltaTime;
+    const float rustSpeed = RUST_CHANGE_SPEED * deltaTime;
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -109,6 +111,10 @@ void processInput(GLFWwindow* window, Renderer& renderer, float deltaTime) {
         renderer.moveSphere(glm::vec3(0.0f, 0.0f, -moveSpeed));
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
         renderer.moveSphere(glm::vec3(0.0f, 0.0f, moveSpeed));
+    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
+        renderer.adjustRustLevel(rustSpeed);      // Increase rust
+    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
+        renderer.adjustRustLevel(-rustSpeed);     // Decrease rust
 }
 
 GLuint createQuadVAO() {

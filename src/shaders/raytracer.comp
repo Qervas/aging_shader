@@ -3,6 +3,7 @@
 #include "common/constants.glsl"
 #include "common/structures.glsl"
 #include "common/utils.glsl"
+#include "common/noise.glsl"
 #include "materials/brdf.glsl"
 #include "materials/material_library.glsl"
 #include "intersect/ray.glsl"
@@ -12,17 +13,12 @@ layout(local_size_x = 8, local_size_y = 8) in;
 layout(rgba32f, binding = 0) uniform image2D outputImage;
 
 uniform vec3 spherePosition;
+uniform float rustLevel;
 
 Sphere sphere = Sphere(
         spherePosition, // center
         1.0, // radius
-        Material( // material
-            vec3(1.0, 0.765, 0.336), // albedo (gold color)
-            1.0, // metallic
-            0.1, // roughness
-            0.47 // IOR
-        )
-    );
+        createSteelMaterial(rustLevel, spherePosition));
 
 vec3 trace(Ray ray) {
     HitInfo hitInfo;

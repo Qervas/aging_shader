@@ -17,11 +17,13 @@ void Renderer::init() {
     createShaders();
     createOutputTexture();
     spherePositionLoc = glGetUniformLocation(computeProgram, "spherePosition");
-    if (spherePositionLoc == -1) {
-        throw std::runtime_error("Could not find spherePosition uniform");
+    rustLevelLoc = glGetUniformLocation(computeProgram, "rustLevel");
+    if (spherePositionLoc == -1 || rustLevelLoc == -1) {
+        throw std::runtime_error("Could not find shader uniforms");
     }
-    glUseProgram(computeProgram);
-    glUniform3fv(spherePositionLoc, 1, glm::value_ptr(spherePosition));
+
+    // glUseProgram(computeProgram);
+    // glUniform3fv(spherePositionLoc, 1, glm::value_ptr(spherePosition));
 }
 
 void Renderer::createOutputTexture() {
@@ -39,12 +41,17 @@ void Renderer::createOutputTexture() {
 void Renderer::render() {
     glUseProgram(computeProgram);
     glUniform3fv(spherePositionLoc, 1, glm::value_ptr(spherePosition));
+    glUniform1f(rustLevelLoc, rustLevel);
 
     // Dispatch compute shader
     glDispatchCompute((width + 7) / 8, (height + 7) / 8, 1);
 
     // Make sure writing to image has finished before read
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+}
+
+void Renderer::adjustRustLevel(float delta) {
+    rustLevel = glm::clamp(rustLevel + delta, 0.0f, 1.0f);
 }
 
 void Renderer::moveSphere(const glm::vec3& delta) {
