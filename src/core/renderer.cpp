@@ -67,8 +67,11 @@ GLuint Renderer::compileComputeShader(const std::string& source) {
 }
 
 void Renderer::createShaders() {
-    std::string computeSource = loadShaderSource("shaders/raytracer.comp");
-    GLuint computeShader = compileComputeShader(computeSource);
+    std::string computePath = "shaders/raytracer.comp";
+    std::string computeSource = loadShaderSource(computePath);
+    std::string preprocessedSource = preprocessShader(computeSource, getShaderDirectory(computePath));
+
+    GLuint computeShader = compileComputeShader(preprocessedSource);
 
     computeProgram = glCreateProgram();
     glAttachShader(computeProgram, computeShader);
@@ -83,4 +86,44 @@ void Renderer::createShaders() {
     }
 
     glDeleteShader(computeShader);
+}
+
+std::string Renderer::getShaderDirectory(const std::string& shaderPath) {
+    size_t lastSlash = shaderPath.find_last_of("/\\");
+    if (lastSlash != std::string::npos) {
+        return shaderPath.substr(0, lastSlash);
+    }
+    return "";
+}
+
+std::string Renderer::preprocessShader(const std::string& source, const std::string& shaderDir) {
+    std::string result = source;
+    std::string includeDirective = "#include";
+
+    size_t pos = 0;
+    while ((pos = result.find(includeDirective, pos)) != std::string::npos) {
+        // Find the opening quote
+        size_t startQuote = result.find("\"", pos);
+        if (startQuote == std::string::npos) break;
+
+        // Find the closing quote
+        size_t endQuote = result.find("\"", startQuote + 1);
+        if (endQuote == std::string::npos) break;
+
+        // Extract the include filename
+        std::string filename = result.substr(startQuote + 1, endQuote - startQuote - 1);
+        std::string includePath = shaderDir + "/" + filename;
+
+        // Load and preprocess the included file
+        std::string includeContent = loadShaderSource(includePath);
+        includeContent = preprocessShader(includeContent, getShaderDirectory(includePath));
+
+        // Replace the include directive with the processed content
+        result.replace(pos, endQuote - pos + 1, includeContent);
+
+        // Move past the included content
+        pos += includeContent.length();
+    }
+
+    return result;
 }

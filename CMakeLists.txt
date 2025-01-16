@@ -59,10 +59,26 @@ if(ENABLE_WARNINGS)
     endif()
 endif()
 
-# Copy shader files to build directory
-file(GLOB SHADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/*")
-file(COPY ${SHADER_FILES} DESTINATION "${CMAKE_BINARY_DIR}/shaders")
-
+# Create symlink for shaders directory
+if(UNIX)
+    add_custom_command(
+        TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E create_symlink
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders
+            ${CMAKE_BINARY_DIR}/shaders
+    )
+else()
+    # On Windows, we need admin privileges for symlinks, so we might want to fall back to copying
+    # Or use mklink with proper permissions
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+        add_custom_command(
+            TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders
+                ${CMAKE_BINARY_DIR}/shaders
+        )
+    endif()
+endif()
 # Optional: Add tests
 if(BUILD_TESTS)
     enable_testing()

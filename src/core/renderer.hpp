@@ -15,6 +15,8 @@ public:
     void resize(int width, int height);
     GLuint getOutputTexture() const { return outputTexture; }
     static std::string loadShaderSource(const std::string& path);
+    static std::string preprocessShader(const std::string& source, const std::string& shaderDir);
+    static std::string getShaderDirectory(const std::string& shaderPath);
 
 private:
     int width, height;

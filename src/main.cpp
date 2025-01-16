@@ -138,9 +138,15 @@ GLuint createQuadProgram() {
         return shader;
     };
 
-    // Load and compile shaders
-    std::string vertSource = Renderer::loadShaderSource("shaders/quad.vert");
-    std::string fragSource = Renderer::loadShaderSource("shaders/quad.frag");
+    std::string vertPath = "shaders/quad.vert";
+    std::string fragPath = "shaders/quad.frag";
+
+    std::string vertSource = Renderer::loadShaderSource(vertPath);
+    std::string fragSource = Renderer::loadShaderSource(fragPath);
+
+    // Preprocess shaders
+    vertSource = Renderer::preprocessShader(vertSource, Renderer::getShaderDirectory(vertPath));
+    fragSource = Renderer::preprocessShader(fragSource, Renderer::getShaderDirectory(fragPath));
 
     GLuint vertShader = compileShader(vertSource, GL_VERTEX_SHADER);
     GLuint fragShader = compileShader(fragSource, GL_FRAGMENT_SHADER);
