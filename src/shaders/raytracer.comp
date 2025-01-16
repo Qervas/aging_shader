@@ -11,8 +11,10 @@
 layout(local_size_x = 8, local_size_y = 8) in;
 layout(rgba32f, binding = 0) uniform image2D outputImage;
 
-const Sphere sphere = Sphere(
-        vec3(0.0, 0.0, -5.0), // center
+uniform vec3 spherePosition;
+
+Sphere sphere = Sphere(
+        spherePosition, // center
         1.0, // radius
         Material( // material
             vec3(1.0, 0.765, 0.336), // albedo (gold color)

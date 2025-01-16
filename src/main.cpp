@@ -2,11 +2,12 @@
 #include <iostream>
 #include <vector>
 
-const int WINDOW_WIDTH = 800;
-const int WINDOW_HEIGHT = 600;
+const int WINDOW_WIDTH = 1024;
+const int WINDOW_HEIGHT = 768;
+const float MOVE_SPEED = 2.f;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
-void processInput(GLFWwindow* window);
+void processInput(GLFWwindow* window, Renderer& renderer, float deltaTime);
 GLuint createQuadProgram();
 GLuint createQuadVAO();
 
@@ -45,10 +46,14 @@ int main() {
         // Set texture uniform
         glUseProgram(quadProgram);
         glUniform1i(glGetUniformLocation(quadProgram, "screenTexture"), 0);
-
+        float lastFrame = 0.0f;
         // Main rendering loop
         while (!glfwWindowShouldClose(window)) {
-            processInput(window);
+            float currentFrame = glfwGetTime();
+            float deltaTime = currentFrame - lastFrame;
+            lastFrame = currentFrame;
+
+            processInput(window, renderer, deltaTime);
 
             // Render the scene using compute shader
             renderer.render();
@@ -85,9 +90,25 @@ void framebuffer_size_callback([[maybe_unused]]  GLFWwindow* window, int width, 
     glViewport(0, 0, width, height);
 }
 
-void processInput(GLFWwindow* window) {
+void processInput(GLFWwindow* window, Renderer& renderer, float deltaTime) {
+    const float moveSpeed = MOVE_SPEED * deltaTime;
+
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    // Movement controls with moveSpeed instead of MOVE_SPEED
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+        renderer.moveSphere(glm::vec3(-moveSpeed, 0.0f, 0.0f));
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+        renderer.moveSphere(glm::vec3(moveSpeed, 0.0f, 0.0f));
+    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+        renderer.moveSphere(glm::vec3(0.0f, moveSpeed, 0.0f));
+    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+        renderer.moveSphere(glm::vec3(0.0f, -moveSpeed, 0.0f));
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        renderer.moveSphere(glm::vec3(0.0f, 0.0f, -moveSpeed));
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        renderer.moveSphere(glm::vec3(0.0f, 0.0f, moveSpeed));
 }
 
 GLuint createQuadVAO() {

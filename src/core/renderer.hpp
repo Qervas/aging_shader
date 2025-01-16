@@ -17,11 +17,15 @@ public:
     static std::string loadShaderSource(const std::string& path);
     static std::string preprocessShader(const std::string& source, const std::string& shaderDir);
     static std::string getShaderDirectory(const std::string& shaderPath);
+    void moveSphere(const glm::vec3& delta);
+    const glm::vec3& getSpherePosition() const { return spherePosition; }
 
 private:
     int width, height;
     GLuint computeProgram;
     GLuint outputTexture;
+    glm::vec3 spherePosition{0.0f, 0.0f, -1.0f};
+    GLint spherePositionLoc{-1};
 
     void createShaders();
     void createOutputTexture();
