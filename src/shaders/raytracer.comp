@@ -3,11 +3,17 @@
 layout(local_size_x = 8, local_size_y = 8) in;
 layout(rgba32f, binding = 0) uniform image2D outputImage;
 
+struct Material {
+    vec3 albedo; // base color
+    float metallic; // 0 = dielectric, 1 = metal
+    float roughness; // 0 = smooth, 1 = rough
+    float ior; // index of refraction
+};
+
 struct Sphere {
     vec3 center;
     float radius;
-    vec3 color;
-    float metallic;
+    Material material;
 };
 
 struct Ray {
@@ -15,20 +21,79 @@ struct Ray {
     vec3 direction;
 };
 
-// Scene constants
+struct HitInfo {
+    bool hit;
+    float t;
+    vec3 position;
+    vec3 normal;
+    Material material;
+};
+
+// Constants
+const float PI = 3.14159265359;
 const vec3 LIGHT_DIR = normalize(vec3(1.0, 1.0, 1.0));
-const vec3 SKY_COLOR = vec3(0.5, 0.7, 1.0);
+const vec3 LIGHT_COLOR = vec3(1.0, 1.0, 0.9);
+const float LIGHT_INTENSITY = 3.0;
+const vec3 SKY_COLOR = vec3(0.1, 0.3, 0.6);
 const float GROUND_Y = -1.0;
 
-// Scene objects
+// Scene setup
 const Sphere sphere = Sphere(
-    vec3(0.0, 0.0, -5.0),  // center
-    1.0,                    // radius
-    vec3(0.8, 0.8, 0.8),   // color
-    0.9                     // metallic
-);
+        vec3(0.0, 0.0, -5.0), // center
+        1.0, // radius
+        Material(
+            vec3(0.95, 0.64, 0.54), // copper color
+            0.9, // metallic
+            0.1, // roughness
+            1.45 // IOR
+        )
+    );
 
-bool intersectSphere(Ray ray, Sphere sphere, out float t, out vec3 normal) {
+const Material groundMaterial = Material(
+        vec3(0.2, 0.2, 0.2), // albedo
+        0.0, // metallic
+        0.8, // roughness
+        1.5 // IOR
+    );
+
+// BRDF Functions
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH * NdotH;
+
+    float nom = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return nom / denom;
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r * r) / 8.0;
+
+    float nom = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return nom / denom;
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}
+
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+bool intersectSphere(Ray ray, Sphere sphere, out HitInfo hitInfo) {
     vec3 oc = ray.origin - sphere.center;
     float a = dot(ray.direction, ray.direction);
     float b = 2.0 * dot(oc, ray.direction);
@@ -37,59 +102,105 @@ bool intersectSphere(Ray ray, Sphere sphere, out float t, out vec3 normal) {
 
     if (discriminant < 0.0) return false;
 
-    float t1 = (-b - sqrt(discriminant)) / (2.0 * a);
-    float t2 = (-b + sqrt(discriminant)) / (2.0 * a);
-
-    t = t1 < t2 ? t1 : t2;
+    float t = (-b - sqrt(discriminant)) / (2.0 * a);
     if (t < 0.0) return false;
 
-    vec3 hitPoint = ray.origin + t * ray.direction;
-    normal = normalize(hitPoint - sphere.center);
+    hitInfo.hit = true;
+    hitInfo.t = t;
+    hitInfo.position = ray.origin + t * ray.direction;
+    hitInfo.normal = normalize(hitInfo.position - sphere.center);
+    hitInfo.material = sphere.material;
     return true;
 }
 
-bool intersectGround(Ray ray, out float t, out vec3 normal) {
+bool intersectGround(Ray ray, out HitInfo hitInfo) {
     if (ray.direction.y >= 0.0) return false;
 
-    t = -(ray.origin.y - GROUND_Y) / ray.direction.y;
+    float t = -(ray.origin.y - GROUND_Y) / ray.direction.y;
     if (t < 0.0) return false;
 
-    normal = vec3(0.0, 1.0, 0.0);
+    hitInfo.hit = true;
+    hitInfo.t = t;
+    hitInfo.position = ray.origin + t * ray.direction;
+    hitInfo.normal = vec3(0.0, 1.0, 0.0);
+    hitInfo.material = groundMaterial;
+
+    // Checkerboard pattern
+    float scale = 2.0;
+    bool x = mod(floor(hitInfo.position.x * scale), 2.0) == 0.0;
+    bool z = mod(floor(hitInfo.position.z * scale), 2.0) == 0.0;
+    if (x ^^ z) {
+        hitInfo.material.albedo *= 0.5;
+    }
+
     return true;
+}
+
+vec3 calculatePBR(HitInfo hit, vec3 viewDir) {
+    vec3 N = hit.normal;
+    vec3 V = -viewDir;
+    vec3 L = LIGHT_DIR;
+    vec3 H = normalize(V + L);
+
+    // Calculate base reflectivity
+    vec3 F0 = vec3(0.04);
+    F0 = mix(F0, hit.material.albedo, hit.material.metallic);
+
+    // Calculate all BRDF terms
+    float NDF = DistributionGGX(N, H, hit.material.roughness);
+    float G = GeometrySmith(N, V, L, hit.material.roughness);
+    vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+
+    // Combine terms
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+    vec3 specular = numerator / denominator;
+
+    // Calculate final color
+    vec3 kS = F;
+    vec3 kD = vec3(1.0) - kS;
+    kD *= 1.0 - hit.material.metallic;
+
+    float NdotL = max(dot(N, L), 0.0);
+    vec3 color = (kD * hit.material.albedo / PI + specular) * LIGHT_COLOR * LIGHT_INTENSITY * NdotL;
+
+    // Add ambient light
+    vec3 ambient = vec3(0.03) * hit.material.albedo;
+    color += ambient;
+
+    // HDR tonemapping
+    color = color / (color + vec3(1.0));
+    // Gamma correction
+    color = pow(color, vec3(1.0 / 2.2));
+
+    return color;
 }
 
 vec3 trace(Ray ray) {
-    float t, closest_t = 1e30;
-    vec3 normal, hit_normal;
-    vec3 color = SKY_COLOR;
-    bool hit = false;
+    HitInfo hitInfo;
+    hitInfo.hit = false;
 
     // Check sphere intersection
-    if (intersectSphere(ray, sphere, t, normal)) {
-        if (t < closest_t) {
-            closest_t = t;
-            hit_normal = normal;
-            color = sphere.color;
-            hit = true;
-        }
+    HitInfo sphereHit;
+    if (intersectSphere(ray, sphere, sphereHit)) {
+        hitInfo = sphereHit;
     }
 
     // Check ground intersection
-    if (intersectGround(ray, t, normal)) {
-        if (t < closest_t) {
-            closest_t = t;
-            hit_normal = normal;
-            color = vec3(0.3, 0.3, 0.3); // Ground color
-            hit = true;
+    HitInfo groundHit;
+    if (intersectGround(ray, groundHit)) {
+        if (!hitInfo.hit || groundHit.t < hitInfo.t) {
+            hitInfo = groundHit;
         }
     }
 
-    if (hit) {
-        float diffuse = max(dot(hit_normal, LIGHT_DIR), 0.0);
-        color *= diffuse;
+    if (hitInfo.hit) {
+        return calculatePBR(hitInfo, ray.direction);
     }
 
-    return color;
+    // Sky color
+    float t = 0.5 * (normalize(ray.direction).y + 1.0);
+    return mix(vec3(1.0), SKY_COLOR, t);
 }
 
 void main() {
