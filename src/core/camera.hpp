@@ -63,6 +63,16 @@ public:
         }
     }
 
+    void lookAt(const glm::vec3& target) {
+        front = glm::normalize(target - position);
+        right = glm::normalize(glm::cross(front, worldUp));
+        up = glm::normalize(glm::cross(right, front));
+
+        // Calculate yaw and pitch from front vector
+        pitch = glm::degrees(asin(front.y));
+        yaw = glm::degrees(atan2(front.z, front.x));
+    }
+
     void update([[maybe_unused]] float deltaTime) {
         physics.updateCameraPosition(position);
     }

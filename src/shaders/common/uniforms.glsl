@@ -9,5 +9,8 @@ uniform vec3 cameraPosition;
 uniform vec3 cameraFront;
 uniform vec3 cameraUp;
 uniform int numObjects;
-
+uniform float moisture;
+uniform vec3 lightDirection;
+uniform float lightIntensity;
+uniform float iTime;
 #endif // UNIFORMS_GLSL

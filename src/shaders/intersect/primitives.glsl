@@ -39,20 +39,18 @@ bool intersectGround(Ray ray, out HitInfo hitInfo) {
     hitInfo.t = t;
     hitInfo.position = ray.origin + t * ray.direction;
     hitInfo.normal = vec3(0.0, 1.0, 0.0);
-    hitInfo.material = createBasicMaterial(
-            vec3(0.2, 0.2, 0.2), // albedo
-            0.0, // metallic
-            0.8, // roughness
-            1.5, // IOR
-            vec3(0.0, 1.0, 0.0) // normal
+    hitInfo.material = createGroundMaterial(
+            hitInfo.position,
+            hitInfo.normal,
+            -ray.direction // viewDir
         );
 
-    float scale = 2.0;
-    bool x = mod(floor(hitInfo.position.x * scale), 2.0) == 0.0;
-    bool z = mod(floor(hitInfo.position.z * scale), 2.0) == 0.0;
-    if (x ^^ z) {
-        hitInfo.material.albedo *= 0.5;
-    }
+    // float scale = 2.0;
+    // bool x = mod(floor(hitInfo.position.x * scale), 2.0) == 0.0;
+    // bool z = mod(floor(hitInfo.position.z * scale), 2.0) == 0.0;
+    // if (x ^^ z) {
+    //     hitInfo.material.albedo *= 0.5;
+    // }
 
     return true;
 }

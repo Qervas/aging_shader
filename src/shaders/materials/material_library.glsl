@@ -11,6 +11,9 @@ const vec3 DARK_RUST = vec3(0.37, 0.15, 0.08); // Dark brown rust
 const vec3 LIGHT_RUST = vec3(0.71, 0.29, 0.15); // Light orange rust
 const vec3 RED_RUST = vec3(0.58, 0.21, 0.11); // Reddish rust
 const vec3 BROWN_RUST = vec3(0.45, 0.22, 0.12); // Brown rust
+const float RAIN_INTENSITY = 0.8;
+const int NUM_RAIN_DROPS = 100;
+const vec3 RAINY_SKY_COLOR = vec3(0.2, 0.2, 0.3);
 
 Material createBasicMaterial(vec3 albedo, float metallic, float roughness, float ior, vec3 normal) {
     Material mat;
@@ -32,15 +35,41 @@ Material createGoldMaterial() {
     );
 }
 
-Material createGroundMaterial() {
-    return createBasicMaterial(
-        vec3(0.2, 0.2, 0.2), // albedo
-        0.0, // metallic
-        0.8, // roughness
-        1.5, // IOR
-        vec3(0.0, 1.0, 0.0) // default normal
-    );
+vec3 getWetSurfaceColor(vec3 baseColor, vec3 normal, vec3 viewDir) {
+    float wetness = moisture;
+    float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 5.0);
+    vec3 wetColor = mix(baseColor * 0.7, vec3(0.02), 0.5);
+    return mix(baseColor, wetColor, wetness * (0.5 + 0.5 * fresnel));
 }
+
+Material createGroundMaterial(vec3 pos, vec3 normal, vec3 viewDir) {
+    Material mat = createBasicMaterial(
+            vec3(0.1), // darker for wet ground
+            0.0,
+            mix(0.9, 0.1, moisture), // more reflective when wet
+            1.5,
+            normal
+        );
+
+    // Add puddles
+    float puddlePattern = noise(pos * 5.0);
+    puddlePattern = smoothstep(0.3, 0.7, puddlePattern);
+
+    // Make surface wet
+    mat.albedo = getWetSurfaceColor(mat.albedo, normal, viewDir);
+    mat.roughness = mix(mat.roughness, 0.1, puddlePattern * moisture);
+
+    return mat;
+}
+float rainDrop(vec3 p) {
+    float t = mod(iTime * 2.0, 10.0); // Rain animation time
+    vec3 rp = p;
+    rp.y += t * 3.0; // Rain falling speed
+    float drop = noise(rp * 50.0);
+    drop = smoothstep(0.95, 1.0, drop);
+    return drop;
+}
+
 vec4 getRustPattern(vec3 pos, float rustLevel) {
     // Basic noise scales
     const float largeScale = 2.0;
@@ -68,7 +97,15 @@ vec4 getRustPattern(vec3 pos, float rustLevel) {
 
     // Create edge weathering effect
     float edgeRust = pow(1.0 - abs(dot(normalize(pos), vec3(0.0, 1.0, 0.0))), 3.0);
-    rustPattern = mix(rustPattern, rustPattern * (1.0 + edgeRust), 0.5);
+    float moistureEffect = noise(pos * 25.0) * moisture;
+
+    // Enhance rust formation in areas with high moisture
+    float moistureRust = smoothstep(0.4, 0.6, moistureEffect);
+    rustPattern *= (1.0 + moistureRust * 0.5);
+
+    // Make edges more susceptible to rust when moisture is high
+    float edgeInfluence = pow(1.0 - abs(dot(normalize(pos), vec3(0.0, 1.0, 0.0))), 3.0);
+    rustPattern = mix(rustPattern, rustPattern * (1.0 + edgeInfluence * moisture), 0.5);
 
     // Apply global rust level
     rustPattern *= rustLevel;

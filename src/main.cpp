@@ -43,6 +43,7 @@ int main() {
 
     try {
         Renderer renderer(WINDOW_WIDTH, WINDOW_HEIGHT);
+        renderer.setupDramaticScene();
         glfwSetWindowUserPointer(window, &renderer);
         glfwSetCursorPosCallback(window, mouse_callback);
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -142,6 +143,12 @@ void processInput(GLFWwindow* window, Renderer& renderer, float deltaTime) {
         renderer.setFrameWidth(renderer.getFrameWidth() + 0.1f * deltaTime);
         renderer.adjustAge(-ageSpeed);
         renderer.adjustRustLevel(-rustSpeed);
+    }
+    if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
+        renderer.adjustMoisture(0.5f * deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS) {
+        renderer.adjustMoisture(-0.5f * deltaTime);
     }
 }
 

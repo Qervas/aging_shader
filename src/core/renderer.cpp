@@ -43,7 +43,16 @@ void Renderer::init() {
     cameraFrontLoc = glGetUniformLocation(computeProgram, "cameraFront");
     cameraUpLoc = glGetUniformLocation(computeProgram, "cameraUp");
     numObjectsLoc = glGetUniformLocation(computeProgram, "numObjects");
+    moistureLoc = glGetUniformLocation(computeProgram, "moisture");
+    lightDirLoc = glGetUniformLocation(computeProgram, "lightDirection");
+    lightIntensityLoc = glGetUniformLocation(computeProgram, "lightIntensity");
 
+    if (lightDirLoc == -1 || lightIntensityLoc == -1) {
+        throw std::runtime_error("Could not find light uniforms");
+    }
+    if (moistureLoc == -1) {
+        throw std::runtime_error("Could not find moisture uniform");
+    }
     // Check all uniform locations
     if ( rustLevelLoc == -1 ||
         ageLoc == -1 || frameWidthLoc == -1 ||
@@ -90,6 +99,10 @@ void Renderer::render() {
     glUniform3fv(cameraPositionLoc, 1, glm::value_ptr(camera.getPosition()));
     glUniform3fv(cameraFrontLoc, 1, glm::value_ptr(camera.getFront()));
     glUniform3fv(cameraUpLoc, 1, glm::value_ptr(camera.getUp()));
+    glUniform1f(moistureLoc, moisture);
+    glUniform1f(iTimeLoc, currentTime);
+    glUniform3fv(lightDirLoc, 1, glm::value_ptr(lightDirection));
+    glUniform1f(lightIntensityLoc, lightIntensity);
 
     // Dispatch compute shader
     glDispatchCompute((width + 7) / 8, (height + 7) / 8, 1);
@@ -222,4 +235,18 @@ void Renderer::loadPaintingTexture(const std::string& path) {
 
 void Renderer::adjustAge(float delta) {
     age = glm::clamp(age + delta, 0.0f, 1.0f);
+}
+
+void Renderer::setupDramaticScene() {
+    // Position camera for dramatic angle
+    camera.setPosition(glm::vec3(3.0f, 2.0f, 3.0f));
+    camera.lookAt(glm::vec3(0.0f, 0.0f, 0.0f));
+
+    // Set environment parameters
+    setMoisture(0.8f);  // Very wet
+    setRustLevel(0.7f); // Significantly rusted
+
+    // Add dramatic lighting
+    setLightIntensity(2.0f);
+    setLightDirection(glm::vec3(-1.0f, -1.0f, -1.0f));
 }
