@@ -3,6 +3,7 @@
 
 #include "../common/structures.glsl"
 #include "../common/noise.glsl"
+#include "../common/uniforms.glsl"
 
 const vec3 STEEL_COLOR = vec3(0.8, 0.8, 0.8);
 const vec3 RUST_COLOR = vec3(0.6, 0.2, 0.1);
@@ -140,6 +141,85 @@ Material createSteelMaterial(float rustLevel, vec3 worldPos, vec3 normal) {
     mat.ior = 2.5;
     mat.normal = bumpedNormal;
     return mat;
+}
+
+float woodNoise(vec3 pos) {
+    float grain = noise(pos * vec3(10.0, 1.0, 1.0));
+    float rings = noise(pos * vec3(20.0, 2.0, 2.0));
+    return mix(grain, rings, 0.5);
+}
+
+Material createWoodMaterial(vec3 pos, float age) {
+    vec3 lightWood = vec3(0.7, 0.4, 0.2);
+    vec3 darkWood = vec3(0.3, 0.2, 0.1);
+
+    // Wood grain pattern
+    float grain = woodNoise(pos);
+
+    // Age effects
+    float crack = noise(pos * 50.0 + age * 10.0);
+    float weathering = noise(pos * 2.0 + age * 5.0);
+
+    // Darken and add variation with age
+    vec3 woodColor = mix(lightWood, darkWood, grain);
+    woodColor = mix(woodColor, woodColor * 0.7, weathering * age);
+
+    // Add cracks
+    float crackPattern = smoothstep(0.7, 0.8, crack) * age;
+    woodColor = mix(woodColor, darkWood * 0.5, crackPattern);
+
+    // Calculate normal perturbation from cracks and grain
+    vec3 normal = vec3(0.0, 0.0, 1.0);
+    normal = normalize(normal + vec3(crack, crack, 0.0) * age * 0.1);
+
+    return createBasicMaterial(
+        woodColor,
+        0.0, // non-metallic
+        mix(0.5, 0.9, age), // rougher with age
+        1.5, // IOR
+        normal
+    );
+}
+
+Material createPaintMaterial(vec2 uv, vec3 pos, float age) {
+    // Sample base painting color
+    vec3 paintColor = texture(paintingTexture, uv).rgb;
+
+    // Cracking pattern
+    float crackScale = 20.0 + age * 30.0;
+    vec3 crackPos = pos * crackScale;
+    float crack = noise(crackPos);
+    float crackling = smoothstep(0.6, 0.7, crack) * age;
+
+    // Peeling pattern
+    float peelScale = 5.0 + age * 10.0;
+    float peel = noise(pos * peelScale + age * 2.0);
+    float peeling = smoothstep(0.7, 0.8, peel) * age;
+
+    // Color aging
+    vec3 agedColor = mix(paintColor, paintColor * 0.7, age * 0.5);
+
+    // Add yellowing
+    vec3 yellowTint = vec3(0.9, 0.8, 0.6);
+    agedColor = mix(agedColor, agedColor * yellowTint, age * 0.3);
+
+    // Apply cracking and peeling
+    agedColor = mix(agedColor, vec3(0.2), crackling * 0.5);
+    agedColor = mix(agedColor, vec3(0.1), peeling);
+
+    // Normal perturbation from cracks and peeling
+    vec3 normal = vec3(0.0, 0.0, 1.0);
+    normal = normalize(normal +
+                vec3(crack, crack, 0.0) * age * 0.2 +
+                vec3(peel, peel, 0.0) * age * 0.3);
+
+    return createBasicMaterial(
+        agedColor,
+        0.0, // non-metallic
+        mix(0.2, 0.8, age), // rougher with age
+        1.5, // IOR
+        normal
+    );
 }
 
 #endif // MATERIAL_LIBRARY_GLSL

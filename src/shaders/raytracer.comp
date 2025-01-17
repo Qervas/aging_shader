@@ -4,6 +4,7 @@
 #include "common/structures.glsl"
 #include "common/utils.glsl"
 #include "common/noise.glsl"
+#include "common/uniforms.glsl"
 #include "materials/brdf.glsl"
 #include "materials/material_library.glsl"
 #include "intersect/ray.glsl"
@@ -27,9 +28,30 @@ Sphere sphere = Sphere(
         )
     );
 
+Rectangle painting = Rectangle(
+        vec3(0.0, 0.0, -5.0), // center
+        vec3(0.0, 0.0, 1.0), // normal
+        vec3(0.0, 1.0, 0.0), // up
+        2.0, // width
+        1.5, // height
+        createBasicMaterial( // default material
+            vec3(1.0), // albedo
+            0.0, // metallic
+            0.5, // roughness
+            1.5, // IOR
+            vec3(0.0, 0.0, 1.0) // normal
+        )
+    );
 vec3 trace(Ray ray) {
     HitInfo hitInfo;
     hitInfo.hit = false;
+
+    HitInfo paintingHit;
+    if (intersectRectangle(ray, painting, paintingHit)) {
+        if (!hitInfo.hit || paintingHit.t < hitInfo.t) {
+            hitInfo = paintingHit;
+        }
+    }
 
     HitInfo sphereHit;
     if (intersectSphere(ray, sphere, rustLevel, sphereHit)) {

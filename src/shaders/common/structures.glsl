@@ -28,4 +28,19 @@ struct HitInfo {
     Material material;
 };
 
+struct Rectangle {
+    vec3 center;
+    vec3 normal;
+    vec3 up;
+    float width;
+    float height;
+    Material material;
+};
+
+struct Frame {
+    Rectangle painting;
+    float frameWidth;
+    Material frameMaterial;
+};
+
 #endif // STRUCTURES_GLSL

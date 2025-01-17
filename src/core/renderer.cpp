@@ -16,14 +16,16 @@ Renderer::~Renderer() {
 void Renderer::init() {
     createShaders();
     createOutputTexture();
+    loadPaintingTexture("textures/painting.jpg");
     spherePositionLoc = glGetUniformLocation(computeProgram, "spherePosition");
     rustLevelLoc = glGetUniformLocation(computeProgram, "rustLevel");
-    if (spherePositionLoc == -1 || rustLevelLoc == -1) {
+    ageLoc = glGetUniformLocation(computeProgram, "age");
+    frameWidthLoc = glGetUniformLocation(computeProgram, "frameWidth");
+    if (spherePositionLoc == -1 || rustLevelLoc == -1 ||
+        ageLoc == -1 || frameWidthLoc == -1) {
         throw std::runtime_error("Could not find shader uniforms");
     }
 
-    // glUseProgram(computeProgram);
-    // glUniform3fv(spherePositionLoc, 1, glm::value_ptr(spherePosition));
 }
 
 void Renderer::createOutputTexture() {
@@ -40,8 +42,13 @@ void Renderer::createOutputTexture() {
 
 void Renderer::render() {
     glUseProgram(computeProgram);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, paintingTexture);
+
     glUniform3fv(spherePositionLoc, 1, glm::value_ptr(spherePosition));
     glUniform1f(rustLevelLoc, rustLevel);
+    glUniform1f(ageLoc, age);
+    glUniform1f(frameWidthLoc, frameWidth);
 
     // Dispatch compute shader
     glDispatchCompute((width + 7) / 8, (height + 7) / 8, 1);
@@ -145,4 +152,36 @@ std::string Renderer::preprocessShader(const std::string& source, const std::str
     }
 
     return result;
+}
+
+void Renderer::loadPaintingTexture(const std::string& path) {
+    int width, height, channels;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 0);
+    if (!data) {
+        throw std::runtime_error("Failed to load painting texture: " + std::string(stbi_failure_reason()));
+    }
+
+    glGenTextures(1, &paintingTexture);
+    glBindTexture(GL_TEXTURE_2D, paintingTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    GLenum format = channels == 4 ? GL_RGBA : GL_RGB;
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    stbi_image_free(data);
+
+    // Get uniform location and bind to texture unit 1
+    paintingTextureLoc = glGetUniformLocation(computeProgram, "paintingTexture");
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, paintingTexture);
+    glUniform1i(paintingTextureLoc, 1);
+}
+
+void Renderer::adjustAge(float delta) {
+    age = glm::clamp(age + delta, 0.0f, 1.0f);
 }

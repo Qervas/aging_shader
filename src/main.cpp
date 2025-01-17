@@ -94,6 +94,8 @@ void framebuffer_size_callback([[maybe_unused]]  GLFWwindow* window, int width, 
 void processInput(GLFWwindow* window, Renderer& renderer, float deltaTime) {
     const float moveSpeed = MOVE_SPEED * deltaTime;
     const float rustSpeed = RUST_CHANGE_SPEED * deltaTime;
+    const float ageSpeed = 0.5f * deltaTime;
+
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -111,10 +113,16 @@ void processInput(GLFWwindow* window, Renderer& renderer, float deltaTime) {
         renderer.moveSphere(glm::vec3(0.0f, 0.0f, -moveSpeed));
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
         renderer.moveSphere(glm::vec3(0.0f, 0.0f, moveSpeed));
-    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS){
+        renderer.setFrameWidth(renderer.getFrameWidth() - 0.1f * deltaTime);
+        renderer.adjustAge(ageSpeed);      // Increase age
         renderer.adjustRustLevel(rustSpeed);      // Increase rust
-    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
+    }
+    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS){
+        renderer.setFrameWidth(renderer.getFrameWidth() + 0.1f * deltaTime);
+        renderer.adjustAge(-ageSpeed);     // Decrease age
         renderer.adjustRustLevel(-rustSpeed);     // Decrease rust
+    }
 }
 
 GLuint createQuadVAO() {

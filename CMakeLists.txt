@@ -38,6 +38,7 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 target_include_directories(${PROJECT_NAME}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/external
         ${CMAKE_CURRENT_SOURCE_DIR}/external/glad/include
         ${OPENGL_INCLUDE_DIR}
 )
@@ -59,13 +60,19 @@ if(ENABLE_WARNINGS)
     endif()
 endif()
 
-# Create symlink for shaders directory
+# Create symlinks for shaders and textures directories
 if(UNIX)
     add_custom_command(
         TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E create_symlink
             ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders
             ${CMAKE_BINARY_DIR}/shaders
+    )
+    add_custom_command(
+        TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E create_symlink
+            ${CMAKE_CURRENT_SOURCE_DIR}/textures
+            ${CMAKE_BINARY_DIR}/textures
     )
 else()
     # On Windows, we need admin privileges for symlinks, so we might want to fall back to copying
@@ -77,8 +84,15 @@ else()
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders
                 ${CMAKE_BINARY_DIR}/shaders
         )
+        add_custom_command(
+            TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${CMAKE_CURRENT_SOURCE_DIR}/textures
+                ${CMAKE_BINARY_DIR}/textures
+        )
     endif()
 endif()
+
 # Optional: Add tests
 if(BUILD_TESTS)
     enable_testing()

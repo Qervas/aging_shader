@@ -3,6 +3,7 @@
 
 #include "../common/structures.glsl"
 #include "../common/constants.glsl"
+#include "../common/uniforms.glsl"
 
 bool intersectSphere(Ray ray, Sphere sphere, float rustLevel, out HitInfo hitInfo) {
     vec3 oc = ray.origin - sphere.center;
@@ -54,6 +55,50 @@ bool intersectGround(Ray ray, out HitInfo hitInfo) {
     }
 
     return true;
+}
+
+bool intersectRectangle(Ray ray, Rectangle rect, out HitInfo hitInfo) {
+    float denom = dot(ray.direction, rect.normal);
+
+    if (abs(denom) > 0.0001) {
+        vec3 po = rect.center - ray.origin;
+        float t = dot(po, rect.normal) / denom;
+
+        if (t > 0.0) {
+            vec3 p = ray.origin + t * ray.direction - rect.center;
+            vec3 right = normalize(cross(rect.up, rect.normal));
+
+            float x = dot(p, right);
+            float y = dot(p, rect.up);
+
+            if (abs(x) < rect.width * 0.5 && abs(y) < rect.height * 0.5) {
+                hitInfo.hit = true;
+                hitInfo.t = t;
+                hitInfo.position = ray.origin + t * ray.direction;
+                hitInfo.normal = rect.normal;
+
+                // Calculate UV coordinates
+                vec2 uv = vec2(
+                        (x + rect.width * 0.5) / rect.width,
+                        (y + rect.height * 0.5) / rect.height
+                    );
+
+                // Create material based on position
+                if (abs(x) > (rect.width * 0.5 - frameWidth) ||
+                        abs(y) > (rect.height * 0.5 - frameWidth)) {
+                    // Frame material
+                    hitInfo.material = createWoodMaterial(hitInfo.position, age);
+                } else {
+                    // Painting material
+                    hitInfo.material = createPaintMaterial(uv, hitInfo.position, age);
+                }
+
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 #endif // PRIMITIVES_GLSL
