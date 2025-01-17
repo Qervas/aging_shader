@@ -22,6 +22,8 @@ Renderer::~Renderer() {
     glDeleteProgram(computeProgram);
     glDeleteTextures(1, &outputTexture);
     glDeleteBuffers(1, &objectBuffer);
+    glDeleteBuffers(1, &trailBuffer);
+
 }
 
 void Renderer::init() {
@@ -60,6 +62,19 @@ void Renderer::init() {
         cameraPositionLoc == -1 || cameraFrontLoc == -1 ||
         cameraUpLoc == -1 || numObjectsLoc == -1) {
         throw std::runtime_error("Could not find shader uniforms");
+    }
+    glGenBuffers(1, &trailBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, trailBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,
+                 sizeof(WaterTrail) * 1000,
+                 nullptr,
+                 GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, trailBuffer);
+
+    // Get trail uniform location
+    numTrailsLoc = glGetUniformLocation(computeProgram, "numTrails");
+    if (numTrailsLoc == -1) {
+        throw std::runtime_error("Could not find numTrails uniform");
     }
 }
 
@@ -110,6 +125,21 @@ void Renderer::render() {
 
     // Make sure writing to image has finished before read
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    waterTrails.clear();
+    for (const auto& obj : scene.getObjects()) {
+        if (obj.type == ObjectType::SPHERE) {
+            waterTrails.insert(waterTrails.end(),
+                             obj.waterTrails.begin(),
+                             obj.waterTrails.end());
+        }
+    }
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, trailBuffer);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0,
+                   waterTrails.size() * sizeof(WaterTrail),
+                   waterTrails.data());
+
+    glUniform1i(numTrailsLoc, static_cast<GLint>(waterTrails.size()));
 }
 
 void Renderer::adjustRustLevel(float delta) {

@@ -16,6 +16,13 @@ struct EnvironmentParams {
     float timeOfDay;
 };
 
+struct WaterTrail {
+    glm::vec3 position;
+    float intensity;
+    float time;
+};
+
+
 struct SceneObject {
     ObjectType type;
     glm::vec3 position;
@@ -24,6 +31,8 @@ struct SceneObject {
     glm::vec3 rotation{0.0f};
     float rustLevel{0.0f};
     bool isDynamic{false};
+    std::vector<WaterTrail> waterTrails;
+    float lastTrailTime{0.0f};
     struct AgingProperties {
         float exposure;
         float resistance;
@@ -32,7 +41,9 @@ struct SceneObject {
     } agingProps;
 
     void updateAging(const EnvironmentParams& env, float deltaTime);
-
+    void addWaterTrail(const glm::vec3& pos, float intensity) {
+        waterTrails.push_back({pos, intensity, 0.0f});
+    }
     SceneObject(ObjectType t, const glm::vec3& pos)
         : type(t), position(pos) {}
 };

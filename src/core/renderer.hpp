@@ -88,7 +88,9 @@ private:
     float lightIntensity{1.0f};
     GLint lightDirLoc{-1};
     GLint lightIntensityLoc{-1};
-
+    GLuint trailBuffer;
+    GLint numTrailsLoc{-1};
+    std::vector<WaterTrail> waterTrails;
     void updateEnvironment(float deltaTime);
     void createShaders();
     void createOutputTexture();

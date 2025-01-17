@@ -1,5 +1,6 @@
 #include "physics.hpp"
 #include "scene.hpp"
+#include <GLFW/glfw3.h>
 
 
 void Physics::update(float deltaTime) {
@@ -93,9 +94,31 @@ void Physics::handleObjectCollisions(SceneObject& obj) {
                 obj.position.y = GROUND_Y + radius;
                 if (obj.velocity.y < 0) {
                     obj.velocity.y = -obj.velocity.y * RESTITUTION;
+
+                    // Add water trail when sphere hits ground
+                    float impactSpeed = glm::length(obj.velocity);
+                    if (impactSpeed > 0.1f) {
+                        float intensity = glm::clamp(impactSpeed / 10.0f, 0.0f, 1.0f);
+                        obj.addWaterTrail(obj.position - glm::vec3(0.0f, radius - 0.01f, 0.0f), intensity);
+                    }
                 }
             }
-
+            if (obj.position.y <= GROUND_Y + radius + 0.1f &&
+                glm::length(obj.velocity) > 0.1f) {
+                float currentTime = static_cast<float>(glfwGetTime());
+                if (currentTime - obj.lastTrailTime > 0.1f) {
+                    float intensity = glm::clamp(
+                        glm::length(obj.velocity) / 10.0f,
+                        0.0f,
+                        1.0f
+                    );
+                    obj.addWaterTrail(
+                        obj.position - glm::vec3(0.0f, radius - 0.01f, 0.0f),
+                        intensity
+                    );
+                    obj.lastTrailTime = currentTime;
+                }
+            }
             // Wall collision
             if (std::abs(obj.position.x) > WALL_HALF_WIDTH) {
                 // Side walls

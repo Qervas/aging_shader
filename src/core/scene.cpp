@@ -1,5 +1,6 @@
 #include "scene.hpp"
 #include "physics.hpp"
+#include <GLFW/glfw3.h>
 
 Scene::Scene(Physics& physics) : physics(physics) {
     // Add ground as a default object
@@ -8,11 +9,22 @@ Scene::Scene(Physics& physics) : physics(physics) {
 
 }
 
-void Scene::update([[maybe_unused]] float deltaTime) {
+void Scene::update(float deltaTime) {
+    // Create environment parameters based on time of day
+    EnvironmentParams env;
+    env.timeOfDay = static_cast<float>(fmod(glfwGetTime(), 24.0));
+    env.humidity = 0.5f; // Base humidity
+    env.temperature = 20.0f; // Base temperature
+    env.salinity = 0.1f; // Base salinity
+
     for (auto& obj : objects) {
+        // Update physics for dynamic objects
         if (obj.isDynamic) {
             physics.updateObject(obj);
         }
+
+        // Update aging for all objects
+        obj.updateAging(env, deltaTime);
     }
 }
 
