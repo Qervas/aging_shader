@@ -6,6 +6,7 @@ struct Material {
     float metallic;
     float roughness;
     float ior;
+    vec3 normal;
 };
 
 struct Sphere {

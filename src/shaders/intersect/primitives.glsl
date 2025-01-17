@@ -20,7 +20,11 @@ bool intersectSphere(Ray ray, Sphere sphere, float rustLevel, out HitInfo hitInf
     hitInfo.t = t;
     hitInfo.position = ray.origin + t * ray.direction;
     hitInfo.normal = normalize(hitInfo.position - sphere.center);
-    hitInfo.material = createSteelMaterial(rustLevel, hitInfo.position - sphere.center);
+    hitInfo.material = createSteelMaterial(rustLevel,
+            hitInfo.position - sphere.center,
+            hitInfo.normal);
+    // Use the perturbed normal from the material
+    hitInfo.normal = hitInfo.material.normal;
     return true;
 }
 
@@ -34,11 +38,12 @@ bool intersectGround(Ray ray, out HitInfo hitInfo) {
     hitInfo.t = t;
     hitInfo.position = ray.origin + t * ray.direction;
     hitInfo.normal = vec3(0.0, 1.0, 0.0);
-    hitInfo.material = Material(
+    hitInfo.material = createBasicMaterial(
             vec3(0.2, 0.2, 0.2), // albedo
             0.0, // metallic
             0.8, // roughness
-            1.5 // IOR
+            1.5, // IOR
+            vec3(0.0, 1.0, 0.0) // normal
         );
 
     float scale = 2.0;

@@ -18,7 +18,14 @@ uniform float rustLevel;
 Sphere sphere = Sphere(
         spherePosition, // center
         1.0, // radius
-        Material(STEEL_COLOR, 1.0, 0.1, 2.5));
+        createBasicMaterial(
+            STEEL_COLOR, // albedo
+            1.0, // metallic
+            0.1, // roughness
+            2.5, // IOR
+            vec3(0.0, 0.0, 1.0) // default normal
+        )
+    );
 
 vec3 trace(Ray ray) {
     HitInfo hitInfo;

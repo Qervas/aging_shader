@@ -40,6 +40,7 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0) {
 }
 
 vec3 calculatePBR(HitInfo hit, vec3 viewDir) {
+    // Use the potentially perturbed normal from the material
     vec3 N = hit.normal;
     vec3 V = -viewDir;
     vec3 L = LIGHT_DIR;
@@ -47,6 +48,9 @@ vec3 calculatePBR(HitInfo hit, vec3 viewDir) {
 
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, hit.material.albedo, hit.material.metallic);
+
+    // Add cavity shadowing for deep rust
+    float cavityAO = 1.0 - (1.0 - hit.material.metallic) * 0.5;
 
     float NDF = DistributionGGX(N, H, hit.material.roughness);
     float G = GeometrySmith(N, V, L, hit.material.roughness);
@@ -61,9 +65,12 @@ vec3 calculatePBR(HitInfo hit, vec3 viewDir) {
     kD *= 1.0 - hit.material.metallic;
 
     float NdotL = max(dot(N, L), 0.0);
-    vec3 color = (kD * hit.material.albedo / PI + specular) * LIGHT_COLOR * LIGHT_INTENSITY * NdotL;
+    vec3 color = (kD * hit.material.albedo / PI + specular) *
+            LIGHT_COLOR * LIGHT_INTENSITY * NdotL * cavityAO;
 
-    vec3 ambient = vec3(0.03) * hit.material.albedo;
+    // Add ambient occlusion based on rust level
+    vec3 ambient = vec3(0.03) * hit.material.albedo * cavityAO;
+
     return color + ambient;
 }
 
