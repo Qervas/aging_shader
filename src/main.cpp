@@ -6,11 +6,15 @@ const int WINDOW_WIDTH = 1024;
 const int WINDOW_HEIGHT = 768;
 const float MOVE_SPEED = 2.f;
 const float RUST_CHANGE_SPEED = 0.5f;
+float lastX = WINDOW_WIDTH / 2.0f;
+float lastY = WINDOW_HEIGHT / 2.0f;
+bool firstMouse = true;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window, Renderer& renderer, float deltaTime);
 GLuint createQuadProgram();
 GLuint createQuadVAO();
+void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 
 int main() {
     if (!glfwInit()) {
@@ -39,6 +43,10 @@ int main() {
 
     try {
         Renderer renderer(WINDOW_WIDTH, WINDOW_HEIGHT);
+        glfwSetWindowUserPointer(window, &renderer);
+        glfwSetCursorPosCallback(window, mouse_callback);
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
 
         // Create and setup quad for displaying the texture
         GLuint quadVAO = createQuadVAO();
@@ -53,6 +61,7 @@ int main() {
             float currentFrame = glfwGetTime();
             float deltaTime = currentFrame - lastFrame;
             lastFrame = currentFrame;
+            renderer.getPhysics().update(deltaTime);
 
             processInput(window, renderer, deltaTime);
 
@@ -92,36 +101,47 @@ void framebuffer_size_callback([[maybe_unused]]  GLFWwindow* window, int width, 
 }
 
 void processInput(GLFWwindow* window, Renderer& renderer, float deltaTime) {
-    const float moveSpeed = MOVE_SPEED * deltaTime;
-    const float rustSpeed = RUST_CHANGE_SPEED * deltaTime;
-    const float ageSpeed = 0.5f * deltaTime;
-
+    Camera& camera = renderer.getCamera();
+    Physics& physics = renderer.getPhysics();
+    glm::vec3 forward = glm::normalize(glm::vec3(camera.getFront().x, 0.0f, camera.getFront().z));
+    glm::vec3 right = camera.getRight();
+    glm::vec3 moveForce(0.0f);
+    const float MOVE_FORCE = 20.0f;
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    // Movement controls with moveSpeed instead of MOVE_SPEED
-    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-        renderer.moveSphere(glm::vec3(-moveSpeed, 0.0f, 0.0f));
-    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-        renderer.moveSphere(glm::vec3(moveSpeed, 0.0f, 0.0f));
-    if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-        renderer.moveSphere(glm::vec3(0.0f, moveSpeed, 0.0f));
-    if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-        renderer.moveSphere(glm::vec3(0.0f, -moveSpeed, 0.0f));
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        renderer.moveSphere(glm::vec3(0.0f, 0.0f, -moveSpeed));
+        moveForce += forward * MOVE_FORCE;
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        renderer.moveSphere(glm::vec3(0.0f, 0.0f, moveSpeed));
-    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS){
-        renderer.setFrameWidth(renderer.getFrameWidth() - 0.1f * deltaTime);
-        renderer.adjustAge(ageSpeed);      // Increase age
-        renderer.adjustRustLevel(rustSpeed);      // Increase rust
+        moveForce -= forward * MOVE_FORCE;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        moveForce -= right * MOVE_FORCE;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        moveForce += right * MOVE_FORCE;
+    if (physics.isCameraGrounded()) {
+        physics.applyCameraForce(moveForce * deltaTime);
+    } else {
+        // Reduced air control
+        physics.applyCameraForce(moveForce * deltaTime * 0.2f);
     }
-    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS){
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+        camera.jump();
+    camera.update(deltaTime);
+
+    // Rust and age controls (keeping existing functionality)
+    const float rustSpeed = RUST_CHANGE_SPEED * deltaTime;
+    const float ageSpeed = 0.5f * deltaTime;
+
+    if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
+        renderer.setFrameWidth(renderer.getFrameWidth() - 0.1f * deltaTime);
+        renderer.adjustAge(ageSpeed);
+        renderer.adjustRustLevel(rustSpeed);
+    }
+    if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS) {
         renderer.setFrameWidth(renderer.getFrameWidth() + 0.1f * deltaTime);
-        renderer.adjustAge(-ageSpeed);     // Decrease age
-        renderer.adjustRustLevel(-rustSpeed);     // Decrease rust
+        renderer.adjustAge(-ageSpeed);
+        renderer.adjustRustLevel(-rustSpeed);
     }
 }
 
@@ -204,4 +224,24 @@ GLuint createQuadProgram() {
     glDeleteShader(fragShader);
 
     return program;
+}
+
+void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
+    float xpos = static_cast<float>(xposIn);
+    float ypos = static_cast<float>(yposIn);
+
+    if (firstMouse) {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos;
+
+    lastX = xpos;
+    lastY = ypos;
+
+    Renderer* renderer = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
+    renderer->getCamera().processMouseMovement(xoffset, yoffset);
 }

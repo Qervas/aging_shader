@@ -3,6 +3,9 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <string>
+#include "core/camera.hpp"
+#include "core/physics.hpp"
+#include "core/scene.hpp"
 #include "image_loader.hpp"
 #include <vector>
 
@@ -18,8 +21,6 @@ public:
     static std::string loadShaderSource(const std::string& path);
     static std::string preprocessShader(const std::string& source, const std::string& shaderDir);
     static std::string getShaderDirectory(const std::string& shaderPath);
-    void moveSphere(const glm::vec3& delta);
-    const glm::vec3& getSpherePosition() const { return spherePosition; }
     void setRustLevel(float level) {
         rustLevel = glm::clamp(level, 0.0f, 1.0f);
     }
@@ -34,13 +35,15 @@ public:
         frameWidth = glm::clamp(width, 0.01f, 0.5f);
     }
     float getFrameWidth() const { return frameWidth; }
+    Physics& getPhysics() { return physics; }
+    void setCameraPosition(const glm::vec3& pos) { camera.setPosition(pos); }
+    Camera& getCamera() { return camera; }
+    Scene& getScene() { return scene; }
 
 private:
     int width, height;
     GLuint computeProgram;
     GLuint outputTexture;
-    glm::vec3 spherePosition{0.0f, 0.0f, -1.0f};
-    GLint spherePositionLoc{-1};
     float rustLevel{0.0f}; // 0.0 = no rust, 1.0 = full rust
     GLint rustLevelLoc{-1};
     GLuint paintingTexture;
@@ -49,9 +52,20 @@ private:
     GLint ageLoc{-1};
     GLint frameWidthLoc{-1};
     float frameWidth{0.1f};
+    Physics physics;
+    Camera camera;
+    GLint cameraPositionLoc{-1};
+    GLint cameraFrontLoc{-1};
+    GLint cameraUpLoc{-1};
+    Scene scene;
+    std::vector<GLint> objectPositionLocs;
+    GLint numObjectsLoc{-1};
+    GLuint objectBuffer;
+    std::vector<glm::vec4> objectData;
     void createShaders();
     void createOutputTexture();
     GLuint compileComputeShader(const std::string& source);
     void loadPaintingTexture(const std::string& path);
+
 
 };

@@ -4,28 +4,53 @@
 #include <sstream>
 #include <glm/gtc/type_ptr.hpp>
 
-Renderer::Renderer(int w, int h) : width(w), height(h) {
+Renderer::Renderer(int w, int h)
+    : width(w)
+    , height(h)
+    , camera(physics)
+    , scene(physics)
+{
     init();
+
+    scene.addObject(ObjectType::GROUND, glm::vec3(0.0f, -1.0f, 0.0f), false);
+    scene.addObject(ObjectType::SPHERE, glm::vec3(0.0f, 0.0f, -1.0f), true);
+    scene.addObject(ObjectType::RECTANGLE, glm::vec3(0.0f, 0.0f, -5.0f), true);
 }
 
 Renderer::~Renderer() {
     glDeleteProgram(computeProgram);
     glDeleteTextures(1, &outputTexture);
+    glDeleteBuffers(1, &objectBuffer);
 }
 
 void Renderer::init() {
     createShaders();
     createOutputTexture();
     loadPaintingTexture("textures/painting.jpg");
-    spherePositionLoc = glGetUniformLocation(computeProgram, "spherePosition");
+
+    // Create and initialize object buffer
+    glGenBuffers(1, &objectBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, objectBuffer);
+    // Initialize with some space
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(glm::vec4) * 100, nullptr, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, objectBuffer);
+
+    // Get uniform locations
     rustLevelLoc = glGetUniformLocation(computeProgram, "rustLevel");
     ageLoc = glGetUniformLocation(computeProgram, "age");
     frameWidthLoc = glGetUniformLocation(computeProgram, "frameWidth");
-    if (spherePositionLoc == -1 || rustLevelLoc == -1 ||
-        ageLoc == -1 || frameWidthLoc == -1) {
+    cameraPositionLoc = glGetUniformLocation(computeProgram, "cameraPosition");
+    cameraFrontLoc = glGetUniformLocation(computeProgram, "cameraFront");
+    cameraUpLoc = glGetUniformLocation(computeProgram, "cameraUp");
+    numObjectsLoc = glGetUniformLocation(computeProgram, "numObjects");
+
+    // Check all uniform locations
+    if ( rustLevelLoc == -1 ||
+        ageLoc == -1 || frameWidthLoc == -1 ||
+        cameraPositionLoc == -1 || cameraFrontLoc == -1 ||
+        cameraUpLoc == -1 || numObjectsLoc == -1) {
         throw std::runtime_error("Could not find shader uniforms");
     }
-
 }
 
 void Renderer::createOutputTexture() {
@@ -41,14 +66,30 @@ void Renderer::createOutputTexture() {
 }
 
 void Renderer::render() {
+    // Update object data buffer
+    objectData.clear();
+    const auto& objects = scene.getObjects();
+    for (const auto& obj : objects) {
+        objectData.push_back(glm::vec4(obj.position, static_cast<float>(static_cast<int>(obj.type))));
+    }
+
+    // Update storage buffer
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, objectBuffer);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0,
+                   objectData.size() * sizeof(glm::vec4),
+                   objectData.data());
     glUseProgram(computeProgram);
+    // Update scene uniforms
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, paintingTexture);
 
-    glUniform3fv(spherePositionLoc, 1, glm::value_ptr(spherePosition));
+    glUniform1i(numObjectsLoc, static_cast<GLint>(objects.size()));
     glUniform1f(rustLevelLoc, rustLevel);
     glUniform1f(ageLoc, age);
     glUniform1f(frameWidthLoc, frameWidth);
+    glUniform3fv(cameraPositionLoc, 1, glm::value_ptr(camera.getPosition()));
+    glUniform3fv(cameraFrontLoc, 1, glm::value_ptr(camera.getFront()));
+    glUniform3fv(cameraUpLoc, 1, glm::value_ptr(camera.getUp()));
 
     // Dispatch compute shader
     glDispatchCompute((width + 7) / 8, (height + 7) / 8, 1);
@@ -61,9 +102,6 @@ void Renderer::adjustRustLevel(float delta) {
     rustLevel = glm::clamp(rustLevel + delta, 0.0f, 1.0f);
 }
 
-void Renderer::moveSphere(const glm::vec3& delta) {
-    spherePosition += delta;
-}
 
 std::string Renderer::loadShaderSource(const std::string& path) {
     std::ifstream file(path);
