@@ -43,6 +43,50 @@ Rectangle painting = Rectangle(
         )
     );
 
+vec3 getSkyColor(vec3 rayDir) {
+    // Base sky color with more variation based on moisture
+    vec3 dryColor = vec3(0.1, 0.1, 0.2);
+    vec3 wetColor = vec3(0.02, 0.02, 0.05);
+    vec3 skyColor = mix(dryColor, wetColor, moisture);
+
+    // Add moon
+    vec3 moonDir = normalize(-lightDirection);
+    float moonDot = dot(normalize(rayDir), moonDir);
+
+    // Make moon larger and more distinct
+    float moonSize = 0.9995; // Smaller value = larger moon
+    float moonEdge = 0.9999; // Control moon edge softness
+    float moonDisc = smoothstep(moonSize, moonEdge, moonDot);
+
+    // Add moon details
+    vec3 moonNormal = normalize(rayDir - moonDir);
+    float moonPhase = 0.5 + 0.5 * sin(iTime * 0.1); // Slowly changing moon phase
+    float craterPattern = noise(moonNormal * 10.0) * 0.5 + 0.5;
+    vec3 moonColor = vec3(1.0, 0.98, 0.9) * (0.8 + 0.2 * craterPattern);
+
+    // Moon glow
+    float glowSize = 0.995; // Larger glow
+    float moonGlow = smoothstep(glowSize, moonSize, moonDot) * (1.0 - moisture * 0.8);
+    vec3 glowColor = vec3(0.6, 0.6, 0.8) * (1.0 - moisture * 0.5);
+
+    // Add clouds based on moisture
+    float cloudNoise = noise(rayDir * 5.0 + vec3(iTime * 0.1));
+    float cloudDensity = smoothstep(0.4, 0.6, cloudNoise) * moisture;
+    vec3 cloudColor = mix(vec3(0.8), vec3(0.2), moisture * cloudDensity);
+
+    // Combine everything
+    // First mix sky and clouds
+    skyColor = mix(skyColor, cloudColor, cloudDensity * 0.7);
+
+    // Then add moon and glow, making sure moon is visible through clouds
+    float cloudObscurance = 1.0 - (cloudDensity * 0.5);
+    return mix(
+        skyColor,
+        moonColor,
+        moonDisc * cloudObscurance
+    ) + glowColor * moonGlow * cloudObscurance;
+}
+
 vec3 trace(Ray ray) {
     HitInfo closestHit;
     closestHit.hit = false;
@@ -93,20 +137,7 @@ vec3 trace(Ray ray) {
         vec3 lighting = calculatePBR(closestHit, ray.direction);
         return tonemap(lighting);
     } else {
-        // Sky color with moon
-        vec3 skyColor = mix(vec3(0.02, 0.02, 0.05), vec3(0.1, 0.1, 0.2),
-                0.5 * (normalize(ray.direction).y + 1.0));
-
-        vec3 moonDir = normalize(-lightDirection);
-        float moonDot = dot(normalize(ray.direction), moonDir);
-        float moonIntensity = smoothstep(0.9995, 0.9999, moonDot);
-        vec3 moonColor = vec3(1.0, 0.98, 0.9); // Slightly warm moon color
-
-        // Add moon glow
-        float moonGlow = smoothstep(0.995, 0.9995, moonDot);
-        vec3 glowColor = vec3(0.6, 0.6, 0.8);
-
-        return skyColor + moonColor * moonIntensity + glowColor * moonGlow * 0.3;
+        return getSkyColor(ray.direction);
     }
 }
 void main() {

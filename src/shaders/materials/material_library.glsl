@@ -34,12 +34,12 @@ Material createGoldMaterial() {
 
 float createRipplePattern(vec3 pos) {
     float ripple = 0.0;
-    // Create multiple ripple centers
+    // Create multiple ripple centers with more pronounced effect
     for (int i = 0; i < 5; i++) {
         vec2 center = vec2(sin(iTime * 0.5 + i), cos(iTime * 0.3 + i)) * 2.0;
         float dist = length(pos.xz - center);
-        float wave = sin(dist * 10.0 - iTime * 2.0) * 0.5 + 0.5;
-        ripple += wave * exp(-dist * 2.0);
+        float wave = sin(dist * 8.0 - iTime * 3.0) * 0.8 + 0.2; // Increased amplitude
+        ripple += wave * exp(-dist * 1.5); // Slower falloff
     }
     return ripple;
 }
@@ -167,20 +167,20 @@ Material createGroundMaterial(vec3 pos, vec3 normal, vec3 viewDir) {
     mat.metallic = mix(0.0, 0.3, rustPattern.x);
     mat.roughness = mix(mat.roughness, 0.7, rustPattern.x);
 
-    // Add puddles in the craters
     float craterDepth = -getGroundHeight(pos.xz);
     float puddlePattern = smoothstep(0.1, 0.3, craterDepth) * moisture;
 
     if (puddlePattern > 0.01) {
-        // Add ripple effect to puddles
+        // More pronounced ripple effect
         float ripple = createRipplePattern(pos);
-        mat.normal = normalize(normal + vec3(0.0, ripple * moisture * 0.1, 0.0)); // Changed rippleEffect to ripple
+        mat.normal = normalize(normal + vec3(ripple * moisture * 0.3, 0.0, ripple * moisture * 0.3));
 
-        // Add reflective properties to puddles
+        // More reflective puddles
         vec3 puddleColor = vec3(0.02, 0.02, 0.03);
-        float fresnel = pow(1.0 - max(dot(normal, -viewDir), 0.0), 5.0);
-        mat.albedo = mix(mat.albedo, puddleColor, puddlePattern * (0.5 + 0.5 * fresnel));
-        mat.roughness = mix(mat.roughness, 0.1, puddlePattern);
+        float fresnel = pow(1.0 - max(dot(normal, -viewDir), 0.0), 3.0); // Increased fresnel effect
+        mat.albedo = mix(mat.albedo, puddleColor, puddlePattern * (0.7 + 0.3 * fresnel));
+        mat.roughness = mix(mat.roughness, 0.05, puddlePattern); // More reflective
+        mat.metallic = mix(mat.metallic, 0.3, puddlePattern); // Slight metallic look for water
     }
 
     return mat;
