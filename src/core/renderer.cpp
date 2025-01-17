@@ -252,3 +252,16 @@ void Renderer::setupDramaticScene() {
     setLightIntensity(2.0f);
     setLightDirection(glm::vec3(-1.0f, -1.0f, -1.0f));
 }
+
+void Renderer::updateWeather(float deltaTime) {
+    static float weatherCycle = 0.0f;
+    weatherCycle += deltaTime * 0.1f;
+
+    // Simulate weather changes
+    float newMoisture = (sin(weatherCycle) * 0.5f + 0.5f);
+    setMoisture(newMoisture);
+
+    // Adjust lighting based on weather
+    float intensity = 1.0f - (moisture * 0.5f);
+    setLightIntensity(intensity);
+}

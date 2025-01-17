@@ -63,6 +63,8 @@ int main() {
             lastFrame = currentFrame;
             renderer.getPhysics().update(deltaTime);
             renderer.getScene().update(deltaTime);
+            renderer.updateWeather(deltaTime);
+            renderer.update(deltaTime);
             processInput(window, renderer, deltaTime);
 
             // Render the scene using compute shader
@@ -106,7 +108,7 @@ void processInput(GLFWwindow* window, Renderer& renderer, float deltaTime) {
     glm::vec3 forward = glm::normalize(glm::vec3(camera.getFront().x, 0.0f, camera.getFront().z));
     glm::vec3 right = camera.getRight();
     glm::vec3 moveForce(0.0f);
-    const float MOVE_FORCE = 30.0f;
+    const float MOVE_FORCE = 20.0f;
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);

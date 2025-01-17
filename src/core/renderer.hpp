@@ -57,6 +57,8 @@ public:
         lightIntensity = glm::clamp(intensity, 0.0f, 10.0f);
     }
     void setupDramaticScene();
+    void updateWeather(float deltaTime);
+
 private:
     int width, height;
     GLuint computeProgram;

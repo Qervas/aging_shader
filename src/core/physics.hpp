@@ -38,7 +38,7 @@ private:
     const float GRAVITY = -9.81f;
     const float GROUND_Y = -1.0f;
     const float RESTITUTION = 0.6f;
-    const float FRICTION = 1.0f;
+    const float FRICTION = 1.5f;
     const float AIR_RESISTANCE = 0.1f;
     const std::vector<SceneObject>* objectsInScene{nullptr};
 

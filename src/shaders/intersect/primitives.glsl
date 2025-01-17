@@ -30,21 +30,35 @@ bool intersectSphere(Ray ray, Sphere sphere, float rustLevel, out HitInfo hitInf
 }
 
 bool intersectGround(Ray ray, out HitInfo hitInfo) {
-    if (ray.direction.y >= 0.0) return false;
+    // Use ray marching for the uneven ground
+    float t = 0.0;
+    float maxDist = 100.0;
+    float minDist = 0.001;
+    int maxSteps = 64;
 
-    float t = -(ray.origin.y - GROUND_Y) / ray.direction.y;
-    if (t < 0.0) return false;
+    for (int i = 0; i < maxSteps; i++) {
+        vec3 p = ray.origin + ray.direction * t;
+        float h = getGroundHeight(p.xz);
+        float d = p.y - (GROUND_Y + h);
 
-    hitInfo.hit = true;
-    hitInfo.t = t;
-    hitInfo.position = ray.origin + t * ray.direction;
-    hitInfo.normal = vec3(0.0, 1.0, 0.0);
-    hitInfo.material = createGroundMaterial(
-            hitInfo.position,
-            hitInfo.normal,
-            -ray.direction // viewDir
-        );
-    return true;
+        if (d < minDist) {
+            hitInfo.hit = true;
+            hitInfo.t = t;
+            hitInfo.position = p;
+            hitInfo.normal = calculateGroundNormal(p.xz);
+            hitInfo.material = createGroundMaterial(
+                    hitInfo.position,
+                    hitInfo.normal,
+                    -ray.direction
+                );
+            return true;
+        }
+
+        if (t > maxDist) break;
+        t += max(d * 0.5, minDist);
+    }
+
+    return false;
 }
 
 bool intersectRectangle(Ray ray, Rectangle rect, out HitInfo hitInfo) {

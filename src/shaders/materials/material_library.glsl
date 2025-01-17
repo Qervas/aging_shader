@@ -32,88 +32,58 @@ Material createGoldMaterial() {
     );
 }
 
-vec3 getWetSurfaceColor(vec3 baseColor, vec3 normal, vec3 viewDir) {
-    float wetness = moisture;
-    float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 5.0);
-    vec3 wetColor = mix(baseColor * 0.7, vec3(0.02), 0.5);
-    return mix(baseColor, wetColor, wetness * (0.5 + 0.5 * fresnel));
+float createRipplePattern(vec3 pos) {
+    float ripple = 0.0;
+    // Create multiple ripple centers
+    for (int i = 0; i < 5; i++) {
+        vec2 center = vec2(sin(iTime * 0.5 + i), cos(iTime * 0.3 + i)) * 2.0;
+        float dist = length(pos.xz - center);
+        float wave = sin(dist * 10.0 - iTime * 2.0) * 0.5 + 0.5;
+        ripple += wave * exp(-dist * 2.0);
+    }
+    return ripple;
 }
 
-Material createGroundMaterial(vec3 pos, vec3 normal, vec3 viewDir) {
-    // Create base material
-    Material mat = createBasicMaterial(
-            vec3(0.1), // dark ground color
-            0.0, // non-metallic base
-            0.9, // rough by default
-            1.5,
-            normal
-        );
+float getGroundHeight(vec2 pos) {
+    // Create crater pattern
+    float crater1 = exp(-length(pos + vec2(1.0, 0.5)) * 1.5);
+    float crater2 = exp(-length(pos - vec2(2.0, -1.0)) * 2.0) * 0.7;
+    float crater3 = exp(-length(pos - vec2(-1.5, 1.0)) * 1.0) * 0.5;
 
-    // Create complex puddle pattern
-    float largeScale = noise(pos * 0.5);
-    float mediumScale = noise(pos * 2.0 + largeScale);
-    float smallScale = noise(pos * 8.0 + mediumScale);
+    // Add some noise for rough terrain
+    float roughness = noise(vec3(pos * 2.0, 0.0)) * 0.2;
 
-    // Combine different scales for natural-looking puddles
-    float puddlePattern = smoothstep(0.3, 0.7,
-            largeScale * 0.5 +
-                mediumScale * 0.3 +
-                smallScale * 0.2
-        );
+    // Combine craters and roughness
+    return -(crater1 + crater2 + crater3) * 0.5 - roughness;
+}
 
-    // Add some variety to puddle edges
-    float edgeNoise = noise(pos * 15.0) * 0.1;
-    puddlePattern = smoothstep(0.4, 0.6, puddlePattern + edgeNoise);
+vec3 calculateGroundNormal(vec2 pos) {
+    float eps = 0.01;
+    float h = getGroundHeight(pos);
+    float hx = getGroundHeight(pos + vec2(eps, 0.0));
+    float hz = getGroundHeight(pos + vec2(0.0, eps));
 
-    // Apply moisture influence
-    puddlePattern *= moisture;
+    return normalize(vec3(
+            (h - hx) / eps,
+            1.0,
+            (h - hz) / eps
+        ));
+}
 
-    // Calculate reflections
-    vec3 moonDir = normalize(-lightDirection);
-    vec3 reflection = reflect(viewDir, normal);
-    float moonReflection = pow(max(0.0, dot(reflection, moonDir)), 64.0);
+vec3 calculateRustColor(vec4 rustPattern) {
+    float deep = rustPattern.y;
+    float surface = rustPattern.z;
 
-    // Create subtle ground texture
-    float groundPattern = noise(pos * 3.0);
-    vec3 dryGroundColor = vec3(0.1) * (0.8 + 0.2 * groundPattern);
+    // Mix different rust colors based on depth
+    vec3 rustColor = mix(STEEL_COLOR, LIGHT_RUST, surface);
+    rustColor = mix(rustColor, RED_RUST, deep * 0.7);
+    rustColor = mix(rustColor, DARK_RUST, deep * deep * 0.5);
 
-    // Puddle properties
-    vec3 puddleColor = vec3(0.02, 0.02, 0.03); // Dark water base color
-    float puddleMetallic = 0.0;
-    float puddleRoughness = 0.05; // Very smooth for water
+    // Add slight color variation
+    float variation = noise(vec3(rustPattern.x * 42.0));
+    rustColor *= 0.8 + variation * 0.4;
 
-    // Add ripple effect to puddles
-    float ripple = sin(pos.x * 8.0 + pos.z * 8.0 + iTime * 0.5) * 0.5 + 0.5;
-    ripple *= noise(pos * 10.0 + iTime * 0.1); // Make ripples more natural
-
-    // Fresnel effect for puddles
-    float fresnel = pow(1.0 - max(dot(normal, -viewDir), 0.0), 5.0);
-
-    // Moon reflection in puddles
-    vec3 moonlightColor = vec3(1.0, 0.98, 0.9);
-    vec3 puddleReflection = moonlightColor * (moonReflection * 2.0 + ripple * 0.1);
-
-    // Mix dry ground with puddle based on pattern
-    mat.albedo = mix(dryGroundColor, puddleColor, puddlePattern);
-    mat.metallic = mix(0.0, puddleMetallic, puddlePattern);
-    mat.roughness = mix(0.9, puddleRoughness, puddlePattern);
-
-    // Add reflections and fresnel to puddles
-    mat.albedo = mix(mat.albedo, puddleReflection, puddlePattern * (fresnel * 0.8 + 0.2));
-
-    // Add subtle normal perturbation for puddles
-    vec3 puddleNormal = normal;
-    if (puddlePattern > 0.1) {
-        float rippleStrength = 0.02 * puddlePattern;
-        puddleNormal = normalize(normal + vec3(
-                        sin(pos.x * 10.0 + iTime) * rippleStrength,
-                        0.0,
-                        cos(pos.z * 10.0 + iTime) * rippleStrength
-                    ));
-    }
-    mat.normal = puddleNormal;
-
-    return mat;
+    return rustColor;
 }
 
 vec4 getRustPattern(vec3 pos, float rustLevel) {
@@ -167,20 +137,53 @@ vec4 getRustPattern(vec3 pos, float rustLevel) {
     return vec4(rustPattern, deepRust, surfaceRust, displacement);
 }
 
-vec3 calculateRustColor(vec4 rustPattern) {
-    float deep = rustPattern.y;
-    float surface = rustPattern.z;
+vec3 getWetSurfaceColor(vec3 baseColor, vec3 normal, vec3 viewDir) {
+    float wetness = moisture;
+    float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 5.0);
+    vec3 wetColor = mix(baseColor * 0.7, vec3(0.02), 0.5);
+    return mix(baseColor, wetColor, wetness * (0.5 + 0.5 * fresnel));
+}
 
-    // Mix different rust colors based on depth
-    vec3 rustColor = mix(STEEL_COLOR, LIGHT_RUST, surface);
-    rustColor = mix(rustColor, RED_RUST, deep * 0.7);
-    rustColor = mix(rustColor, DARK_RUST, deep * deep * 0.5);
+Material createGroundMaterial(vec3 pos, vec3 normal, vec3 viewDir) {
+    // Create base material
+    Material mat = createBasicMaterial(
+            vec3(0.2, 0.18, 0.15), // Slightly darker ground color
+            0.0, // non-metallic base
+            0.9, // rough by default
+            1.5,
+            normal
+        );
 
-    // Add slight color variation
-    float variation = noise(vec3(rustPattern.x * 42.0));
-    rustColor *= 0.8 + variation * 0.4;
+    // Create crater rim effect
+    float craterRim = smoothstep(0.3, 0.5, -getGroundHeight(pos.xz));
 
-    return rustColor;
+    // Add rust effect to crater rims
+    float rustAmount = craterRim * rustLevel;
+    vec4 rustPattern = getRustPattern(pos, rustAmount);
+    vec3 rustColor = calculateRustColor(rustPattern);
+
+    // Mix ground color with rust
+    mat.albedo = mix(mat.albedo, rustColor, rustPattern.x);
+    mat.metallic = mix(0.0, 0.3, rustPattern.x);
+    mat.roughness = mix(mat.roughness, 0.7, rustPattern.x);
+
+    // Add puddles in the craters
+    float craterDepth = -getGroundHeight(pos.xz);
+    float puddlePattern = smoothstep(0.1, 0.3, craterDepth) * moisture;
+
+    if (puddlePattern > 0.01) {
+        // Add ripple effect to puddles
+        float ripple = createRipplePattern(pos);
+        mat.normal = normalize(normal + vec3(0.0, ripple * moisture * 0.1, 0.0)); // Changed rippleEffect to ripple
+
+        // Add reflective properties to puddles
+        vec3 puddleColor = vec3(0.02, 0.02, 0.03);
+        float fresnel = pow(1.0 - max(dot(normal, -viewDir), 0.0), 5.0);
+        mat.albedo = mix(mat.albedo, puddleColor, puddlePattern * (0.5 + 0.5 * fresnel));
+        mat.roughness = mix(mat.roughness, 0.1, puddlePattern);
+    }
+
+    return mat;
 }
 
 vec3 calculateRustNormal(vec3 pos, vec4 rustPattern, vec3 normal) {

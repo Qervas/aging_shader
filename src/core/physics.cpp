@@ -132,7 +132,9 @@ bool Physics::checkSphereCollision(const glm::vec3& position, float radius) {
 }
 
 bool Physics::checkGroundCollision(const glm::vec3& position, float height) {
-    return position.y - height/2.0f < GROUND_Y;
+    float groundHeight = GROUND_Y - 0.5f *
+        std::exp(-glm::length(glm::vec2(position.x, position.z)) * 1.5f);
+    return position.y - height/2.0f < groundHeight;
 }
 
 void Physics::updateObject(SceneObject& obj) {
