@@ -4,7 +4,6 @@
 
 const int WINDOW_WIDTH = 1024;
 const int WINDOW_HEIGHT = 768;
-const float MOVE_SPEED = 2.f;
 const float RUST_CHANGE_SPEED = 0.5f;
 float lastX = WINDOW_WIDTH / 2.0f;
 float lastY = WINDOW_HEIGHT / 2.0f;
@@ -63,7 +62,7 @@ int main() {
             float deltaTime = currentFrame - lastFrame;
             lastFrame = currentFrame;
             renderer.getPhysics().update(deltaTime);
-
+            renderer.getScene().update(deltaTime);
             processInput(window, renderer, deltaTime);
 
             // Render the scene using compute shader
@@ -107,7 +106,7 @@ void processInput(GLFWwindow* window, Renderer& renderer, float deltaTime) {
     glm::vec3 forward = glm::normalize(glm::vec3(camera.getFront().x, 0.0f, camera.getFront().z));
     glm::vec3 right = camera.getRight();
     glm::vec3 moveForce(0.0f);
-    const float MOVE_FORCE = 20.0f;
+    const float MOVE_FORCE = 30.0f;
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);

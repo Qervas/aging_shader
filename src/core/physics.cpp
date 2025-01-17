@@ -2,16 +2,18 @@
 #include "scene.hpp"
 #include <GLFW/glfw3.h>
 
+Physics::Physics(const std::vector<SceneObject>& objects)
+    : objectsInScene(&objects) {
+    // Initialize sphere in the air
+    spherePosition = glm::vec3(0.0f, 5.0f, -1.0f);
+    sphereVelocity = glm::vec3(0.0f);
+}
 
 void Physics::update(float deltaTime) {
-    // Apply gravity to both sphere and camera
-    sphereVelocity.y += GRAVITY * deltaTime;
+    // Apply gravity to camera
     if (!cameraGrounded) {
         cameraVelocity.y += GRAVITY * deltaTime;
     }
-
-    // Update sphere position
-    spherePosition += sphereVelocity * deltaTime;
 
     // Apply friction to camera when grounded
     if (cameraGrounded) {
@@ -23,22 +25,56 @@ void Physics::update(float deltaTime) {
         cameraVelocity *= (1.0f - AIR_RESISTANCE * deltaTime);
     }
 
+    // Handle camera collisions
     handleCollisions();
+
+    // Update all scene objects
+    if (objectsInScene) {
+        for (auto& obj : *const_cast<std::vector<SceneObject>*>(objectsInScene)) {
+            if (obj.isDynamic) {
+                updateObject(obj);
+            }
+        }
+    }
 }
 
 void Physics::updateCameraPosition(glm::vec3& position) {
-    glm::vec3 newPos = position + cameraVelocity * 0.016f; // Assuming 60 FPS
+    glm::vec3 newPos = position + cameraVelocity * 0.016f;
+    bool collision = false;
 
-    // Check for collisions at new position
-    bool collision = checkGroundCollision(newPos, CAMERA_HEIGHT) ||
-                    checkSphereCollision(newPos, CAMERA_RADIUS);
+    // Check sphere collision first
+    glm::vec3 toSphere = spherePosition - newPos;
+    float distance = glm::length(toSphere);
 
-    if (!collision) {
-        position = newPos;
-    } else {
-        // Handle collision response
-        cameraVelocity = glm::vec3(0.0f);
+    if (distance < (CAMERA_RADIUS + SPHERE_RADIUS)) {
+        // Collision detected
+        glm::vec3 normal = glm::normalize(toSphere);
+        float penetration = CAMERA_RADIUS + SPHERE_RADIUS - distance;
+
+        // Move objects apart
+        newPos -= normal * penetration * 0.5f;
+        spherePosition += normal * penetration * 0.5f;
+
+        // Calculate impulse
+        float impulseMagnitude = glm::length(cameraVelocity) * 1.5f;
+        sphereVelocity += normal * impulseMagnitude;
+        cameraVelocity = cameraVelocity * 0.5f; // Reduce camera velocity
+
+        collision = true;
     }
+
+    // Check ground collision
+    if (checkGroundCollision(newPos, CAMERA_HEIGHT)) {
+        newPos.y = GROUND_Y + CAMERA_HEIGHT * 0.5f;
+        if (cameraVelocity.y < 0) {
+            cameraVelocity.y = 0;
+        }
+        collision = true;
+    }
+
+    // Update position
+    position = newPos;
+    cameraPosition = position;
 
     // Update grounded state
     cameraGrounded = checkGroundCollision(position, CAMERA_HEIGHT + 0.1f);
@@ -49,20 +85,50 @@ void Physics::applyCameraForce(const glm::vec3& force) {
 }
 
 void Physics::handleCollisions() {
-    // Ground collision for sphere
+    // Ground collision
     float bottomY = spherePosition.y - SPHERE_RADIUS;
     if (bottomY < GROUND_Y) {
         spherePosition.y = GROUND_Y + SPHERE_RADIUS;
         if (sphereVelocity.y < 0) {
+            // Add some horizontal momentum loss on impact
             sphereVelocity.y = -sphereVelocity.y * RESTITUTION;
+            sphereVelocity.x *= 0.9f;
+            sphereVelocity.z *= 0.9f;
         }
     }
-}
 
+    // Wall collisions
+    const float WALL_Z = -5.0f;
+    const float WALL_HALF_WIDTH = 5.0f;
+
+    // Side walls with more bounce
+    if (std::abs(spherePosition.x) > WALL_HALF_WIDTH - SPHERE_RADIUS) {
+        spherePosition.x = std::copysign(WALL_HALF_WIDTH - SPHERE_RADIUS, spherePosition.x);
+        sphereVelocity.x = -sphereVelocity.x * RESTITUTION;
+    }
+
+    // Back wall
+    if (spherePosition.z < WALL_Z + SPHERE_RADIUS) {
+        spherePosition.z = WALL_Z + SPHERE_RADIUS;
+        sphereVelocity.z = -sphereVelocity.z * RESTITUTION;
+    }
+}
 bool Physics::checkSphereCollision(const glm::vec3& position, float radius) {
-    // Check collision with the metal sphere
     float distance = glm::length(position - spherePosition);
-    return distance < (radius + SPHERE_RADIUS);
+    if (distance < (radius + SPHERE_RADIUS)) {
+        glm::vec3 normal = glm::normalize(spherePosition - position);
+        float overlap = (radius + SPHERE_RADIUS) - distance;
+
+        // Move sphere away from collision
+        spherePosition += normal * overlap * 0.5f;
+
+        // Apply impulse based on camera velocity
+        float impulseMagnitude = glm::length(cameraVelocity) * 0.8f;
+        sphereVelocity += normal * impulseMagnitude;
+
+        return true;
+    }
+    return false;
 }
 
 bool Physics::checkGroundCollision(const glm::vec3& position, float height) {
@@ -72,7 +138,19 @@ bool Physics::checkGroundCollision(const glm::vec3& position, float height) {
 void Physics::updateObject(SceneObject& obj) {
     if (!obj.isDynamic) return;
 
-    updateDynamicObject(obj, 0.016f); // Using fixed timestep for now
+    if (obj.type == ObjectType::SPHERE) {
+        // Sync sphere position and velocity with Physics system
+        obj.position = spherePosition;
+        obj.velocity = sphereVelocity;
+    }
+
+    updateDynamicObject(obj, 0.016f);
+
+    if (obj.type == ObjectType::SPHERE) {
+        // Update Physics system with new position and velocity
+        spherePosition = obj.position;
+        sphereVelocity = obj.velocity;
+    }
 }
 
 void Physics::handleObjectCollisions(SceneObject& obj) {
@@ -97,26 +175,10 @@ void Physics::handleObjectCollisions(SceneObject& obj) {
 
                     // Add water trail when sphere hits ground
                     float impactSpeed = glm::length(obj.velocity);
-                    if (impactSpeed > 0.1f) {
-                        float intensity = glm::clamp(impactSpeed / 10.0f, 0.0f, 1.0f);
+                    if (impactSpeed > 0.5f) { // Increased threshold
+                        float intensity = glm::clamp(impactSpeed / 15.0f, 0.0f, 0.8f); // Reduced max intensity
                         obj.addWaterTrail(obj.position - glm::vec3(0.0f, radius - 0.01f, 0.0f), intensity);
                     }
-                }
-            }
-            if (obj.position.y <= GROUND_Y + radius + 0.1f &&
-                glm::length(obj.velocity) > 0.1f) {
-                float currentTime = static_cast<float>(glfwGetTime());
-                if (currentTime - obj.lastTrailTime > 0.1f) {
-                    float intensity = glm::clamp(
-                        glm::length(obj.velocity) / 10.0f,
-                        0.0f,
-                        1.0f
-                    );
-                    obj.addWaterTrail(
-                        obj.position - glm::vec3(0.0f, radius - 0.01f, 0.0f),
-                        intensity
-                    );
-                    obj.lastTrailTime = currentTime;
                 }
             }
             // Wall collision
@@ -231,4 +293,7 @@ void Physics::updateDynamicObject(SceneObject& obj, float deltaTime) {
 
     // Handle collisions
     handleObjectCollisions(obj);
+
+    // Apply air resistance
+    obj.velocity *= (1.0f - AIR_RESISTANCE * deltaTime);
 }

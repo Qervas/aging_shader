@@ -13,16 +13,11 @@ void Scene::update(float deltaTime) {
     // Create environment parameters based on time of day
     EnvironmentParams env;
     env.timeOfDay = static_cast<float>(fmod(glfwGetTime(), 24.0));
-    env.humidity = 0.5f; // Base humidity
-    env.temperature = 20.0f; // Base temperature
-    env.salinity = 0.1f; // Base salinity
+    env.humidity = 0.5f;
+    env.temperature = 20.0f;
+    env.salinity = 0.1f;
 
     for (auto& obj : objects) {
-        // Update physics for dynamic objects
-        if (obj.isDynamic) {
-            physics.updateObject(obj);
-        }
-
         // Update aging for all objects
         obj.updateAging(env, deltaTime);
     }

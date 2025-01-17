@@ -68,27 +68,6 @@ Material createGroundMaterial(vec3 pos, vec3 normal, vec3 viewDir) {
     // Apply moisture influence
     puddlePattern *= moisture;
 
-    float trailInfluence = 0.0;
-
-    // Process all water trails
-    for (int i = 0; i < numTrails; i++) {
-        vec3 trailPos = waterTrails[i].position;
-        float trailIntensity = waterTrails[i].intensity;
-        float trailAge = iTime - waterTrails[i].time;
-
-        // Calculate distance-based influence
-        float dist = length(pos.xz - trailPos.xz);
-        float fadeRadius = mix(0.5, 1.5, trailIntensity);
-        float fade = smoothstep(fadeRadius, 0.0, dist);
-
-        // Age-based decay
-        float ageFade = smoothstep(2.0, 0.0, trailAge);
-
-        trailInfluence = max(trailInfluence, fade * ageFade * trailIntensity);
-    }
-
-    puddlePattern = max(puddlePattern, trailInfluence);
-
     // Calculate reflections
     vec3 moonDir = normalize(-lightDirection);
     vec3 reflection = reflect(viewDir, normal);

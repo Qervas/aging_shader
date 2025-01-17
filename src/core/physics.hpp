@@ -28,18 +28,18 @@ public:
 private:
     glm::vec3 spherePosition{0.0f, 0.0f, -1.0f};
     glm::vec3 sphereVelocity{0.0f, 0.0f, 0.0f};
-    const float SPHERE_RADIUS = 1.0f;
-
+    glm::vec3 cameraPosition{0.0f, 2.0f, 3.0f};
     glm::vec3 cameraVelocity{0.0f, 0.0f, 0.0f};
     bool cameraGrounded = false;
+    const float SPHERE_RADIUS = 0.5f;
     const float CAMERA_HEIGHT = 1.8f;  // Standing height
     const float CAMERA_RADIUS = 0.3f;
     // Physics constants
     const float GRAVITY = -9.81f;
     const float GROUND_Y = -1.0f;
-    const float RESTITUTION = 0.3f;
-    const float FRICTION = 8.0f;
-    const float AIR_RESISTANCE = 0.5f;
+    const float RESTITUTION = 0.6f;
+    const float FRICTION = 1.0f;
+    const float AIR_RESISTANCE = 0.1f;
     const std::vector<SceneObject>* objectsInScene{nullptr};
 
     void handleCollisions();
