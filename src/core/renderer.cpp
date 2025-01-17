@@ -14,7 +14,8 @@ Renderer::Renderer(int w, int h)
 
     scene.addObject(ObjectType::GROUND, glm::vec3(0.0f, -1.0f, 0.0f), false);
     scene.addObject(ObjectType::SPHERE, glm::vec3(0.0f, 0.0f, -1.0f), true);
-    scene.addObject(ObjectType::RECTANGLE, glm::vec3(0.0f, 0.0f, -5.0f), true);
+    scene.addObject(ObjectType::WALL, glm::vec3(0.0f, 0.0f, -5.0f), false);
+    scene.addObject(ObjectType::RECTANGLE, glm::vec3(0.0f, 2.0f, -4.9f), false);
 }
 
 Renderer::~Renderer() {

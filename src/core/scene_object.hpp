@@ -5,7 +5,8 @@
 enum class ObjectType {
     SPHERE,
     RECTANGLE,
-    GROUND
+    GROUND,
+    WALL
 };
 
 struct EnvironmentParams {

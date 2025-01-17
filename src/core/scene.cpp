@@ -4,6 +4,8 @@
 Scene::Scene(Physics& physics) : physics(physics) {
     // Add ground as a default object
     addObject(ObjectType::GROUND, glm::vec3(0.0f, -1.0f, 0.0f), false);
+    physics.setSceneObjects(objects);
+
 }
 
 void Scene::update([[maybe_unused]] float deltaTime) {

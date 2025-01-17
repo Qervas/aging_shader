@@ -43,4 +43,13 @@ struct Frame {
     Material frameMaterial;
 };
 
+struct Wall {
+    vec3 position; // Center position of the wall
+    vec3 normal; // Wall normal (facing direction)
+    float width; // Wall width
+    float height; // Wall height
+    float thickness; // Wall thickness
+    Material material;
+};
+
 #endif // STRUCTURES_GLSL

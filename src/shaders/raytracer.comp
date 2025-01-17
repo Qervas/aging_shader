@@ -43,28 +43,6 @@ Rectangle painting = Rectangle(
         )
     );
 
-vec3 renderRain(Ray ray, vec3 baseColor) {
-    vec3 color = baseColor;
-
-    for (int i = 0; i < NUM_RAIN_DROPS; i++) {
-        vec3 dropPos = vec3(
-                noise(vec3(i, 0, iTime)) * 20.0 - 10.0,
-                noise(vec3(i, 1, iTime)) * 10.0 + 5.0,
-                noise(vec3(i, 2, iTime)) * 20.0 - 10.0
-            );
-
-        vec3 dropVel = vec3(0, -8.0, 0); // Rain falling direction
-
-        // Rain streak
-        float streak = length(cross(ray.direction, dropPos - ray.origin)) / length(dropVel);
-        if (streak < 0.01) {
-            color += vec3(0.8) * (1.0 - streak * 100.0) * RAIN_INTENSITY;
-        }
-    }
-
-    return color;
-}
-
 vec3 trace(Ray ray) {
     HitInfo closestHit;
     closestHit.hit = false;
@@ -102,21 +80,35 @@ vec3 trace(Ray ray) {
                 }
             }
         }
+        else if (objType == 3) { // WALL
+            if (intersectWall(ray, objPos, vec3(0.0, 0.0, 1.0), 10.0, 5.0, 0.2, currentHit)) {
+                if (!closestHit.hit || currentHit.t < closestHit.t) {
+                    closestHit = currentHit;
+                }
+            }
+        }
     }
 
-    vec3 finalColor;
     if (closestHit.hit) {
         vec3 lighting = calculatePBR(closestHit, ray.direction);
-        finalColor = tonemap(lighting);
+        return tonemap(lighting);
     } else {
-        float t = 0.5 * (normalize(ray.direction).y + 1.0);
-        finalColor = mix(vec3(0.5), RAINY_SKY_COLOR, t);
+        // Sky color with moon
+        vec3 skyColor = mix(vec3(0.02, 0.02, 0.05), vec3(0.1, 0.1, 0.2),
+                0.5 * (normalize(ray.direction).y + 1.0));
+
+        vec3 moonDir = normalize(-lightDirection);
+        float moonDot = dot(normalize(ray.direction), moonDir);
+        float moonIntensity = smoothstep(0.9995, 0.9999, moonDot);
+        vec3 moonColor = vec3(1.0, 0.98, 0.9); // Slightly warm moon color
+
+        // Add moon glow
+        float moonGlow = smoothstep(0.995, 0.9995, moonDot);
+        vec3 glowColor = vec3(0.6, 0.6, 0.8);
+
+        return skyColor + moonColor * moonIntensity + glowColor * moonGlow * 0.3;
     }
-
-    // Add rain effect
-    return renderRain(ray, finalColor);
 }
-
 void main() {
     ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
     ivec2 image_size = imageSize(outputImage);

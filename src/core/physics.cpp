@@ -1,6 +1,6 @@
 #include "physics.hpp"
 #include "scene.hpp"
-Physics::Physics() {}
+
 
 void Physics::update(float deltaTime) {
     // Apply gravity to both sphere and camera
@@ -78,10 +78,16 @@ void Physics::handleObjectCollisions(SceneObject& obj) {
     // Ground collision
     float bottomY;
     float radius;
+    const float WALL_RESTITUTION = 0.5f;
+    const float WALL_Z = -5.0f;
+    const float WALL_HALF_WIDTH = 5.0f;
+    const float WALL_HEIGHT = 5.0f;
 
     switch(obj.type) {
         case ObjectType::SPHERE:
-            radius = SPHERE_RADIUS; // You might want to make this configurable per object
+            radius = SPHERE_RADIUS;
+
+            // Ground collision
             bottomY = obj.position.y - radius;
             if (bottomY < GROUND_Y) {
                 obj.position.y = GROUND_Y + radius;
@@ -89,18 +95,108 @@ void Physics::handleObjectCollisions(SceneObject& obj) {
                     obj.velocity.y = -obj.velocity.y * RESTITUTION;
                 }
             }
+
+            // Wall collision
+            if (std::abs(obj.position.x) > WALL_HALF_WIDTH) {
+                // Side walls
+                obj.position.x = std::copysign(WALL_HALF_WIDTH, obj.position.x);
+                obj.velocity.x = -obj.velocity.x * WALL_RESTITUTION;
+            }
+
+            if (obj.position.z <= WALL_Z + radius) {
+                // Back wall
+                obj.position.z = WALL_Z + radius;
+                obj.velocity.z = -obj.velocity.z * WALL_RESTITUTION;
+            }
+
+            // Ceiling collision
+            if (obj.position.y + radius > WALL_HEIGHT) {
+                obj.position.y = WALL_HEIGHT - radius;
+                obj.velocity.y = -obj.velocity.y * WALL_RESTITUTION;
+            }
             break;
 
         case ObjectType::RECTANGLE:
-            // Handle rectangle collisions if needed
+            // For rectangles (like paintings), prevent them from going through walls
+            if (obj.position.z <= WALL_Z + 0.1f) {
+                obj.position.z = WALL_Z + 0.1f;
+                obj.velocity = glm::vec3(0.0f); // Stop movement
+            }
+            if (std::abs(obj.position.x) > WALL_HALF_WIDTH - 1.0f) {
+                obj.position.x = std::copysign(WALL_HALF_WIDTH - 1.0f, obj.position.x);
+                obj.velocity.x = 0.0f;
+            }
+            if (obj.position.y < GROUND_Y) {
+                obj.position.y = GROUND_Y;
+                obj.velocity.y = 0.0f;
+            }
+            if (obj.position.y > WALL_HEIGHT - 1.0f) {
+                obj.position.y = WALL_HEIGHT - 1.0f;
+                obj.velocity.y = 0.0f;
+            }
             break;
 
         case ObjectType::GROUND:
-            // Ground doesn't need collision handling
+            // Ground is static, no collision handling needed
+            break;
+
+        case ObjectType::WALL:
+            // Walls are static, no collision handling needed
             break;
     }
 
-    // Object-object collisions could be added here
+    // Object-object collisions
+    for (const auto& other : *objectsInScene) {
+        if (&other == &obj) continue;
+
+        if (obj.type == ObjectType::SPHERE && other.type == ObjectType::SPHERE) {
+            // Sphere-sphere collision
+            glm::vec3 diff = obj.position - other.position;
+            float dist = glm::length(diff);
+            float minDist = SPHERE_RADIUS * 2.0f;
+
+            if (dist < minDist) {
+                // Collision response
+                glm::vec3 normal = glm::normalize(diff);
+                float overlap = minDist - dist;
+
+                // Separate spheres
+                obj.position += normal * (overlap * 0.5f);
+
+                // Calculate new velocities
+                glm::vec3 relativeVel = obj.velocity - other.velocity;
+                float normalVel = glm::dot(relativeVel, normal);
+
+                if (normalVel < 0.0f) {
+                    float j = -(1.0f + RESTITUTION) * normalVel;
+                    obj.velocity += normal * j * 0.5f;
+                }
+            }
+        }
+        else if (obj.type == ObjectType::SPHERE && other.type == ObjectType::RECTANGLE) {
+            // Simple sphere-rectangle collision (basic AABB check)
+            glm::vec3 closest = glm::clamp(
+                obj.position,
+                other.position - glm::vec3(1.0f, 1.0f, 0.1f),
+                other.position + glm::vec3(1.0f, 1.0f, 0.1f)
+            );
+
+            glm::vec3 diff = obj.position - closest;
+            float dist = glm::length(diff);
+
+            if (dist < SPHERE_RADIUS) {
+                // Collision response
+                glm::vec3 normal = glm::normalize(diff);
+                obj.position = closest + normal * SPHERE_RADIUS;
+
+                // Reflect velocity
+                float normalVel = glm::dot(obj.velocity, normal);
+                if (normalVel < 0.0f) {
+                    obj.velocity = glm::reflect(obj.velocity, normal) * WALL_RESTITUTION;
+                }
+            }
+        }
+    }
 }
 
 void Physics::updateDynamicObject(SceneObject& obj, float deltaTime) {

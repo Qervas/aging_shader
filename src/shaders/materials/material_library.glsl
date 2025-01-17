@@ -11,9 +11,6 @@ const vec3 DARK_RUST = vec3(0.37, 0.15, 0.08); // Dark brown rust
 const vec3 LIGHT_RUST = vec3(0.71, 0.29, 0.15); // Light orange rust
 const vec3 RED_RUST = vec3(0.58, 0.21, 0.11); // Reddish rust
 const vec3 BROWN_RUST = vec3(0.45, 0.22, 0.12); // Brown rust
-const float RAIN_INTENSITY = 0.8;
-const int NUM_RAIN_DROPS = 100;
-const vec3 RAINY_SKY_COLOR = vec3(0.2, 0.2, 0.3);
 
 Material createBasicMaterial(vec3 albedo, float metallic, float roughness, float ior, vec3 normal) {
     Material mat;
@@ -43,31 +40,80 @@ vec3 getWetSurfaceColor(vec3 baseColor, vec3 normal, vec3 viewDir) {
 }
 
 Material createGroundMaterial(vec3 pos, vec3 normal, vec3 viewDir) {
+    // Create base material
     Material mat = createBasicMaterial(
-            vec3(0.1), // darker for wet ground
-            0.0,
-            mix(0.9, 0.1, moisture), // more reflective when wet
+            vec3(0.1), // dark ground color
+            0.0, // non-metallic base
+            0.9, // rough by default
             1.5,
             normal
         );
 
-    // Add puddles
-    float puddlePattern = noise(pos * 5.0);
-    puddlePattern = smoothstep(0.3, 0.7, puddlePattern);
+    // Create complex puddle pattern
+    float largeScale = noise(pos * 0.5);
+    float mediumScale = noise(pos * 2.0 + largeScale);
+    float smallScale = noise(pos * 8.0 + mediumScale);
 
-    // Make surface wet
-    mat.albedo = getWetSurfaceColor(mat.albedo, normal, viewDir);
-    mat.roughness = mix(mat.roughness, 0.1, puddlePattern * moisture);
+    // Combine different scales for natural-looking puddles
+    float puddlePattern = smoothstep(0.3, 0.7,
+            largeScale * 0.5 +
+                mediumScale * 0.3 +
+                smallScale * 0.2
+        );
+
+    // Add some variety to puddle edges
+    float edgeNoise = noise(pos * 15.0) * 0.1;
+    puddlePattern = smoothstep(0.4, 0.6, puddlePattern + edgeNoise);
+
+    // Apply moisture influence
+    puddlePattern *= moisture;
+
+    // Calculate reflections
+    vec3 moonDir = normalize(-lightDirection);
+    vec3 reflection = reflect(viewDir, normal);
+    float moonReflection = pow(max(0.0, dot(reflection, moonDir)), 64.0);
+
+    // Create subtle ground texture
+    float groundPattern = noise(pos * 3.0);
+    vec3 dryGroundColor = vec3(0.1) * (0.8 + 0.2 * groundPattern);
+
+    // Puddle properties
+    vec3 puddleColor = vec3(0.02, 0.02, 0.03); // Dark water base color
+    float puddleMetallic = 0.0;
+    float puddleRoughness = 0.05; // Very smooth for water
+
+    // Add ripple effect to puddles
+    float ripple = sin(pos.x * 8.0 + pos.z * 8.0 + iTime * 0.5) * 0.5 + 0.5;
+    ripple *= noise(pos * 10.0 + iTime * 0.1); // Make ripples more natural
+
+    // Fresnel effect for puddles
+    float fresnel = pow(1.0 - max(dot(normal, -viewDir), 0.0), 5.0);
+
+    // Moon reflection in puddles
+    vec3 moonlightColor = vec3(1.0, 0.98, 0.9);
+    vec3 puddleReflection = moonlightColor * (moonReflection * 2.0 + ripple * 0.1);
+
+    // Mix dry ground with puddle based on pattern
+    mat.albedo = mix(dryGroundColor, puddleColor, puddlePattern);
+    mat.metallic = mix(0.0, puddleMetallic, puddlePattern);
+    mat.roughness = mix(0.9, puddleRoughness, puddlePattern);
+
+    // Add reflections and fresnel to puddles
+    mat.albedo = mix(mat.albedo, puddleReflection, puddlePattern * (fresnel * 0.8 + 0.2));
+
+    // Add subtle normal perturbation for puddles
+    vec3 puddleNormal = normal;
+    if (puddlePattern > 0.1) {
+        float rippleStrength = 0.02 * puddlePattern;
+        puddleNormal = normalize(normal + vec3(
+                        sin(pos.x * 10.0 + iTime) * rippleStrength,
+                        0.0,
+                        cos(pos.z * 10.0 + iTime) * rippleStrength
+                    ));
+    }
+    mat.normal = puddleNormal;
 
     return mat;
-}
-float rainDrop(vec3 p) {
-    float t = mod(iTime * 2.0, 10.0); // Rain animation time
-    vec3 rp = p;
-    rp.y += t * 3.0; // Rain falling speed
-    float drop = noise(rp * 50.0);
-    drop = smoothstep(0.95, 1.0, drop);
-    return drop;
 }
 
 vec4 getRustPattern(vec3 pos, float rustLevel) {
@@ -256,6 +302,67 @@ Material createPaintMaterial(vec2 uv, vec3 pos, float age) {
         mix(0.2, 0.8, age), // rougher with age
         1.5, // IOR
         normal
+    );
+}
+
+vec3 getBrickColor(vec3 pos) {
+    // Brick size and mortar thickness
+    vec2 brickSize = vec2(0.4, 0.2);
+    vec2 mortarThickness = vec2(0.02, 0.02);
+
+    // Scale position for brick pattern
+    vec3 scaledPos = pos * 2.0;
+
+    // Offset alternate rows
+    float rowOffset = floor(scaledPos.y / brickSize.y) * 0.5;
+    scaledPos.x += rowOffset;
+
+    // Calculate brick coordinates
+    vec2 brickCoord = vec2(
+            mod(scaledPos.x, brickSize.x),
+            mod(scaledPos.y, brickSize.y)
+        );
+
+    // Determine if we're in mortar
+    bool inMortar = brickCoord.x < mortarThickness.x ||
+            brickCoord.y < mortarThickness.y ||
+            brickCoord.x > (brickSize.x - mortarThickness.x) ||
+            brickCoord.y > (brickSize.y - mortarThickness.y);
+
+    // Base brick color variations
+    vec3 brickBase = vec3(0.8, 0.3, 0.2);
+    vec3 mortarColor = vec3(0.8, 0.8, 0.8);
+
+    // Add some variation to brick color
+    float variation = noise(pos * 10.0);
+    brickBase *= 0.8 + variation * 0.4;
+
+    // Return either brick or mortar color
+    return inMortar ? mortarColor : brickBase;
+}
+
+Material createBrickMaterial(vec3 pos, vec3 normal) {
+    vec3 baseColor = getBrickColor(pos);
+
+    // Calculate bump mapping for mortar lines
+    float eps = 0.01;
+    vec3 dx = vec3(eps, 0.0, 0.0);
+    vec3 dy = vec3(0.0, eps, 0.0);
+
+    float bx = float(getBrickColor(pos + dx).r) - float(getBrickColor(pos - dx).r);
+    float by = float(getBrickColor(pos + dy).r) - float(getBrickColor(pos - dy).r);
+
+    // Create perturbed normal for bump mapping
+    vec3 tangent = normalize(cross(normal, vec3(0.0, 1.0, 0.0)));
+    vec3 bitangent = normalize(cross(normal, tangent));
+    vec3 bumpedNormal = normalize(normal + (tangent * bx + bitangent * by) * 0.5);
+
+    return createBasicMaterial(
+        baseColor,
+        0.0, // non-metallic
+        0.95, // rough
+        1.5, // IOR
+        bumpedNormal
     );
 }
 

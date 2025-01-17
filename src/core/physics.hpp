@@ -5,7 +5,8 @@
 
 class Physics {
 public:
-    Physics();
+    Physics() =default;
+    Physics(const std::vector<SceneObject>& objects);
     void update(float deltaTime);
     void updateObject(SceneObject& obj);
 
@@ -20,7 +21,9 @@ public:
     void applyCameraForce(const glm::vec3& force);
     bool isCameraGrounded() const { return cameraGrounded; }
     void updateCameraPosition(glm::vec3& position);
-
+    void setSceneObjects(const std::vector<SceneObject>& objects) {
+        objectsInScene = &objects;
+    }
 
 private:
     glm::vec3 spherePosition{0.0f, 0.0f, -1.0f};
@@ -37,6 +40,7 @@ private:
     const float RESTITUTION = 0.3f;
     const float FRICTION = 8.0f;
     const float AIR_RESISTANCE = 0.5f;
+    const std::vector<SceneObject>* objectsInScene{nullptr};
 
     void handleCollisions();
     bool checkSphereCollision(const glm::vec3& position, float radius);

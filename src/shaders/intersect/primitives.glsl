@@ -44,14 +44,6 @@ bool intersectGround(Ray ray, out HitInfo hitInfo) {
             hitInfo.normal,
             -ray.direction // viewDir
         );
-
-    // float scale = 2.0;
-    // bool x = mod(floor(hitInfo.position.x * scale), 2.0) == 0.0;
-    // bool z = mod(floor(hitInfo.position.z * scale), 2.0) == 0.0;
-    // if (x ^^ z) {
-    //     hitInfo.material.albedo *= 0.5;
-    // }
-
     return true;
 }
 
@@ -96,6 +88,34 @@ bool intersectRectangle(Ray ray, Rectangle rect, out HitInfo hitInfo) {
         }
     }
 
+    return false;
+}
+
+bool intersectWall(Ray ray, vec3 position, vec3 normal, float width, float height, float thickness, out HitInfo hitInfo) {
+    float denom = dot(ray.direction, normal);
+
+    if (abs(denom) > 0.0001) {
+        vec3 po = position - ray.origin;
+        float t = dot(po, normal) / denom;
+
+        if (t > 0.0) {
+            vec3 p = ray.origin + t * ray.direction - position;
+            vec3 up = vec3(0.0, 1.0, 0.0);
+            vec3 right = normalize(cross(up, normal));
+
+            float x = dot(p, right);
+            float y = dot(p, up);
+
+            if (abs(x) < width * 0.5 && y > 0.0 && y < height) {
+                hitInfo.hit = true;
+                hitInfo.t = t;
+                hitInfo.position = ray.origin + t * ray.direction;
+                hitInfo.normal = normal;
+                hitInfo.material = createBrickMaterial(hitInfo.position, normal);
+                return true;
+            }
+        }
+    }
     return false;
 }
 
